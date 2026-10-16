@@ -67,13 +67,18 @@ export default function Projects() {
   const [simulateError, setSimulateError] = useState(false);
 
   // ── Fetch function with error handling & loading control ──
-  const fetchRepositories = async (forceError = false) => {
+  const fetchRepositories = async (forceError = false, extraDelay = 2500) => {
     setLoading(true);
     setError(null);
 
     const targetUrl = forceError ? BROKEN_API_URL : API_URL;
 
     try {
+      // Artificial delay so the loading spinner is easily visible and captured for lab screenshots
+      if (extraDelay > 0) {
+        await new Promise((resolve) => setTimeout(resolve, extraDelay));
+      }
+
       const response = await fetch(targetUrl);
 
       if (!response.ok) {
@@ -144,11 +149,21 @@ export default function Projects() {
             <button
               type="button"
               className={styles.actionBtn}
-              onClick={() => fetchRepositories(simulateError)}
-              title="Refresh repositories"
+              onClick={() => fetchRepositories(simulateError, 2500)}
+              title="Refresh repositories (2.5s delay for screenshots)"
               disabled={loading}
             >
               <span>🔄</span> Refresh
+            </button>
+
+            <button
+              type="button"
+              className={styles.actionBtn}
+              onClick={() => fetchRepositories(simulateError, 5000)}
+              title="Hold loading spinner for 5 seconds to comfortably take screenshot"
+              disabled={loading}
+            >
+              <span>⏳</span> Hold Spinner (5s)
             </button>
 
             {/* Test Error State toggle for lab evaluation (Step 6) */}
