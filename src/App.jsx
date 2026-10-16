@@ -23,9 +23,10 @@ import NavBar   from './components/NavBar';
 import Footer   from './components/Footer';
 import Projects from './components/Projects';
 
-import Home     from './pages/Home';
-import Contact  from './pages/Contact';
-import NotFound from './pages/NotFound';
+import Home        from './pages/Home';
+import Contact     from './pages/Contact';
+import TaskManager from './pages/TaskManager';
+import NotFound    from './pages/NotFound';
 
 /* ── Student data ── */
 const STUDENT = {
@@ -94,6 +95,7 @@ export default function App() {
           }
         />
         <Route path="/projects" element={<Projects />} />
+        <Route path="/tasks" element={<TaskManager />} />
         <Route path="/contact" element={<Contact student={STUDENT} />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

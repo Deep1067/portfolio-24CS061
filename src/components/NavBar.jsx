@@ -11,9 +11,10 @@ import { Link, useLocation } from 'react-router-dom';
 import styles from './NavBar.module.css';
 
 const NAV_LINKS = [
-  { label: 'Home',     to: '/' },
-  { label: 'Projects', to: '/projects' },
-  { label: 'Contact',  to: '/contact' },
+  { label: 'Home',      to: '/' },
+  { label: 'Projects',  to: '/projects' },
+  { label: 'Tasks API', to: '/tasks' },
+  { label: 'Contact',   to: '/contact' },
 ];
 
 /**

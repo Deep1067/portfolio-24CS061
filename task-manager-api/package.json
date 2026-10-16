@@ -1,0 +1,25 @@
+{
+  "name": "task-manager-api-24cs061",
+  "version": "1.0.0",
+  "description": "Practical 4: Building a RESTful API with Node.js and Express - Deep Patel (24CS061)",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test-runner.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "express",
+    "rest-api",
+    "crud",
+    "middleware",
+    "charusat"
+  ],
+  "author": "Deep Patel (24CS061)",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  }
+}

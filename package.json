@@ -5,11 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "server": "node task-manager-api/server.js",
+    "test:api": "node task-manager-api/test-runner.js",
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.4"

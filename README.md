@@ -7,6 +7,63 @@ LinkedIn: [https://www.linkedin.com/in/deep-patel-6711aa360/](https://www.linked
 
 ---
 
+## Practical 4 – Building a RESTful API with Node.js and Express
+
+**Course:** ITUE301 – Advanced Web Development Frameworks  
+**Practical No.:** 4 of 13  
+**Objective:** Design and implement a RESTful backend server with complete CRUD endpoints using an Express middleware pipeline.
+
+### Architecture & Middleware Pipeline
+
+```
+Client (Postman / Browser / Thunder Client / React App)
+        │
+        ▼
+  [1. Logging Middleware]                     ──> Logs method, url, timestamp
+        │
+        ▼
+  [2. CORS Middleware]                        ──> Enables cross-origin requests
+        │
+        ▼
+  [3. express.json() Body Parser]             ──> Parses incoming JSON payload
+        │
+        ▼
+  [4. Content-Type Validation Middleware]     ──> Rejects POST/PUT lacking application/json (415)
+        │
+        ▼
+  Express Router
+  ├── GET    /tasks                           ──> getAllTasks (200 OK)
+  ├── GET    /tasks/:id                       ──> [validateTaskId] ──> getTaskById (200 / 404 / 400)
+  ├── POST   /tasks                           ──> createTask (201 Created / 400)
+  ├── PUT    /tasks/:id                       ──> [validateTaskId] ──> updateTask (200 / 404 / 400)
+  ├── DELETE /tasks/:id                       ──> [validateTaskId] ──> deleteTask (200 / 404)
+  └── GET    /test-error                      ──> Deliberately throws error to test 500 handler
+        │
+        ▼
+  [5. 404 Route Not Found Middleware]         ──> Structured JSON for undefined paths (404)
+        │
+        ▼
+  [6. Centralized Global Error Handler]       ──> Last in chain (err, req, res, next) (500)
+```
+
+### Requirements Implemented
+
+| Requirement | Implementation Details | Status |
+|---|---|---|
+| Express Server Setup | Express app configured on port `5000` with `express.json()` | ✅ Done |
+| In-Memory Task Storage | In-memory task array supporting title, description, status, priority, timestamps | ✅ Done |
+| Global Logging Middleware | Logs method, URL, and ISO timestamp for every incoming request | ✅ Done |
+| CRUD Routes | Complete implementation: `GET /tasks`, `GET /tasks/:id`, `POST /tasks`, `PUT /tasks/:id`, `DELETE /tasks/:id` | ✅ Done |
+| Status Codes | Proper usage of `200 OK`, `201 Created`, `400 Bad Request`, `404 Not Found`, `415 Unsupported Media Type`, `500 Server Error` | ✅ Done |
+| Global Error Handler | 4-argument error middleware defined strictly last in the pipeline | ✅ Done |
+| Content-Type Validator (Supplementary) | Custom middleware rejecting POST/PUT without `application/json` header | ✅ Done |
+| Route-Specific ID Validator (Supplementary) | Validates that `:id` parameter is a positive integer before controller logic | ✅ Done |
+| Structured 404 Handler (Supplementary) | Custom catch-all middleware returning structured JSON for undefined routes | ✅ Done |
+| Frontend Integration | Interactive Task Manager & API Console wired at `/tasks` in the portfolio | ✅ Done |
+| Automated Test Suite | `test-api.js` verifying all 12 test assertions (100% pass rate) | ✅ Done |
+
+---
+
 ## Practical 3 – API Integration and Data Rendering in React
 
 **Course:** ITUE301 – Advanced Web Development Frameworks  
