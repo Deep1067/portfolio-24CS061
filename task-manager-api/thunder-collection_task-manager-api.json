@@ -1,0 +1,138 @@
+{
+  "clientName": "Thunder Client",
+  "collectionName": "Practical 4 - Task Manager API (24CS061)",
+  "collectionId": "task-manager-api-24cs061",
+  "dateExported": "2026-10-16",
+  "version": "1.1",
+  "folders": [],
+  "requests": [
+    {
+      "_id": "req-1",
+      "colId": "task-manager-api-24cs061",
+      "name": "1. GET All Tasks (200 OK)",
+      "url": "http://localhost:5000/tasks",
+      "method": "GET",
+      "sortNum": 10000,
+      "created": "2026-10-16",
+      "modified": "2026-10-16",
+      "headers": []
+    },
+    {
+      "_id": "req-2",
+      "colId": "task-manager-api-24cs061",
+      "name": "2. GET Task by ID (200 OK)",
+      "url": "http://localhost:5000/tasks/1",
+      "method": "GET",
+      "sortNum": 20000,
+      "created": "2026-10-16",
+      "modified": "2026-10-16",
+      "headers": []
+    },
+    {
+      "_id": "req-3",
+      "colId": "task-manager-api-24cs061",
+      "name": "3. POST Create Task (201 Created)",
+      "url": "http://localhost:5000/tasks",
+      "method": "POST",
+      "sortNum": 30000,
+      "created": "2026-10-16",
+      "modified": "2026-10-16",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"title\": \"Submit Practical 4 Evidence\",\n  \"description\": \"Captured using Thunder Client in VS Code\",\n  \"priority\": \"High\"\n}",
+        "form": []
+      }
+    },
+    {
+      "_id": "req-4",
+      "colId": "task-manager-api-24cs061",
+      "name": "4. PUT Update Task (200 OK)",
+      "url": "http://localhost:5000/tasks/1",
+      "method": "PUT",
+      "sortNum": 40000,
+      "created": "2026-10-16",
+      "modified": "2026-10-16",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"title\": \"Practical 1: Vite + React Portfolio (Updated)\",\n  \"status\": \"Completed\",\n  \"priority\": \"High\"\n}",
+        "form": []
+      }
+    },
+    {
+      "_id": "req-5",
+      "colId": "task-manager-api-24cs061",
+      "name": "5. DELETE Task by ID (200 OK)",
+      "url": "http://localhost:5000/tasks/5",
+      "method": "DELETE",
+      "sortNum": 50000,
+      "created": "2026-10-16",
+      "modified": "2026-10-16",
+      "headers": []
+    },
+    {
+      "_id": "req-6",
+      "colId": "task-manager-api-24cs061",
+      "name": "6. GET Invalid ID Format (400 Bad Request - ID Middleware)",
+      "url": "http://localhost:5000/tasks/invalid_abc",
+      "method": "GET",
+      "sortNum": 60000,
+      "created": "2026-10-16",
+      "modified": "2026-10-16",
+      "headers": []
+    },
+    {
+      "_id": "req-7",
+      "colId": "task-manager-api-24cs061",
+      "name": "7. POST Missing Content-Type (415 Media Type Middleware)",
+      "url": "http://localhost:5000/tasks",
+      "method": "POST",
+      "sortNum": 70000,
+      "created": "2026-10-16",
+      "modified": "2026-10-16",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "text/plain"
+        }
+      ],
+      "body": {
+        "type": "raw",
+        "raw": "Plain text body without application/json"
+      }
+    },
+    {
+      "_id": "req-8",
+      "colId": "task-manager-api-24cs061",
+      "name": "8. GET Undefined Route (404 Custom Handler Middleware)",
+      "url": "http://localhost:5000/undefined-endpoint-test",
+      "method": "GET",
+      "sortNum": 80000,
+      "created": "2026-10-16",
+      "modified": "2026-10-16",
+      "headers": []
+    },
+    {
+      "_id": "req-9",
+      "colId": "task-manager-api-24cs061",
+      "name": "9. GET Test Error (500 Global Error Handler Middleware)",
+      "url": "http://localhost:5000/test-error",
+      "method": "GET",
+      "sortNum": 90000,
+      "created": "2026-10-16",
+      "modified": "2026-10-16",
+      "headers": []
+    }
+  ]
+}
