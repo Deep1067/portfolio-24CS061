@@ -149,21 +149,11 @@ export default function Projects() {
             <button
               type="button"
               className={styles.actionBtn}
-              onClick={() => fetchRepositories(simulateError, 2500)}
-              title="Refresh repositories (2.5s delay for screenshots)"
+              onClick={() => fetchRepositories(simulateError, 3000)}
+              title="Refresh repositories"
               disabled={loading}
             >
               <span>🔄</span> Refresh
-            </button>
-
-            <button
-              type="button"
-              className={styles.actionBtn}
-              onClick={() => fetchRepositories(simulateError, 5000)}
-              title="Hold loading spinner for 5 seconds to comfortably take screenshot"
-              disabled={loading}
-            >
-              <span>⏳</span> Hold Spinner (5s)
             </button>
 
             {/* Test Error State toggle for lab evaluation (Step 6) */}
