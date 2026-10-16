@@ -1,25 +1,31 @@
 /**
- * App.jsx – Root component for Practical 1: Student Portfolio
+ * App.jsx – Practical 2: State Management and Routing in React
  * Student: Deep Patel  |  Roll No: 24CS061
- * Course:  Computer Engineering, CSPIT, CHARUSAT
+ * Course:  B.Tech Computer Engineering, CSPIT, CHARUSAT University
  *
- * Practical 1 checklist:
- *  ✅ Vite + React scaffold
- *  ✅ Reusable components: Header, About, Skills, Projects, Footer, NavBar
- *  ✅ Props passed to Header (themeColor inline style, name, role…)
- *  ✅ Props passed to About (name, rollNo, course, institute, bio)
- *  ✅ skillList array passed to Skills and rendered dynamically
- *  ✅ NavBar highlights active section via IntersectionObserver
- *  ✅ Projects component with 3 hardcoded sample projects
- *  ✅ .gitignore excludes node_modules (Vite default)
+ * Practical 2 Checklist:
+ *  ✅ BrowserRouter wraps <App /> in main.jsx (only once)
+ *  ✅ React Router Routes and Route for client-side SPA navigation
+ *  ✅ Route "/" renders Home.jsx
+ *  ✅ Route "/projects" renders Projects.jsx
+ *  ✅ Route "/contact" renders Contact.jsx with controlled inputs and useState
+ *  ✅ Route "*" renders NotFound.jsx (404 custom error component)
+ *  ✅ NavBar uses <Link to="..."> components to prevent page reload
+ *  ✅ useState hook used for dark/light mode toggle applying class to root
+ *  ✅ useState hook used in Contact for message input with real-time preview
+ *  ✅ useState hook used in Contact to toggle element visibility (Help banner)
+ *  ✅ Live character count displayed below input
  */
+import { useState, useEffect } from 'react';
+import { Routes, Route } from 'react-router-dom';
 
 import NavBar   from './components/NavBar';
-import Header   from './components/Header';
-import About    from './components/About';
-import Skills   from './components/Skills';
-import Projects from './components/Projects';
 import Footer   from './components/Footer';
+import Projects from './components/Projects';
+
+import Home     from './pages/Home';
+import Contact  from './pages/Contact';
+import NotFound from './pages/NotFound';
 
 /* ── Student data ── */
 const STUDENT = {
@@ -31,16 +37,16 @@ const STUDENT = {
   linkedin:  'https://www.linkedin.com/in/deep-patel-6711aa360/',
 };
 
-/* ── Hero theme color (passed as prop → applied as inline style) ── */
+/* ── Hero theme accent color ── */
 const THEME_COLOR = '#6366f1';
 
-/* ── Skill list array (passed as prop to <Skills />) ── */
+/* ── Skill list array ── */
 const SKILL_LIST = [
   // Frontend
   { name: 'HTML5',       level: 90, category: 'Frontend' },
   { name: 'CSS3',        level: 85, category: 'Frontend' },
   { name: 'JavaScript',  level: 80, category: 'Frontend' },
-  { name: 'React',       level: 70, category: 'Frontend' },
+  { name: 'React',       level: 75, category: 'Frontend' },
   // Programming
   { name: 'C / C++',     level: 85, category: 'Programming' },
   { name: 'Python',      level: 75, category: 'Programming' },
@@ -48,45 +54,57 @@ const SKILL_LIST = [
   // Tools
   { name: 'Git & GitHub',level: 80, category: 'Tools & Dev' },
   { name: 'VS Code',     level: 90, category: 'Tools & Dev' },
-  { name: 'Vite',        level: 65, category: 'Tools & Dev' },
+  { name: 'Vite',        level: 70, category: 'Tools & Dev' },
 ];
 
 export default function App() {
+  // ── useState: Dark / Light Mode Toggle (Supplementary Task) ──
+  const [darkMode, setDarkMode] = useState(true);
+
+  // Sync theme with root HTML element class
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.remove('light');
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
+    }
+  }, [darkMode]);
+
+  const toggleTheme = () => {
+    setDarkMode((prev) => !prev);
+  };
+
   return (
-    <>
-      <NavBar />
+    <div className={`app-container ${darkMode ? 'dark' : 'light'}`}>
+      {/* Navigation bar with React Router Links and Theme Toggle */}
+      <NavBar darkMode={darkMode} onToggle={toggleTheme} />
 
-      <Header
-        name={STUDENT.name}
-        role="Computer Engineering Student & Aspiring Web Developer"
-        description={`I'm ${STUDENT.name}, a passionate Computer Engineering student at ${STUDENT.institute}.
-I love building things for the web, exploring new technologies, and turning ideas into reality through clean, efficient code.`}
-        themeColor={THEME_COLOR}
-        github={STUDENT.github}
-        linkedin={STUDENT.linkedin}
-      />
+      {/* Routes rendering distinct components without full page reload */}
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <Home
+              student={STUDENT}
+              themeColor={THEME_COLOR}
+              skillList={SKILL_LIST}
+            />
+          }
+        />
+        <Route path="/projects" element={<Projects />} />
+        <Route path="/contact" element={<Contact student={STUDENT} />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
 
-      <About
-        name={STUDENT.name}
-        rollNo={STUDENT.rollNo}
-        course={STUDENT.course}
-        institute={STUDENT.institute}
-        bio={`Hi there! I'm ${STUDENT.name}, currently pursuing a B.Tech in Computer Engineering at CSPIT, CHARUSAT University (Roll No: ${STUDENT.rollNo}).
-My passion lies in web technologies, software development, and solving real-world problems with code.
-I enjoy learning by building — every project is an opportunity to grow.
-When I'm not coding, you'll find me exploring the latest in tech or collaborating with peers on interesting ideas.`}
-      />
-
-      <Skills skillList={SKILL_LIST} />
-
-      <Projects />
-
+      {/* Persistent footer across routes */}
       <Footer
         name={STUDENT.name}
         rollNo={STUDENT.rollNo}
         github={STUDENT.github}
         linkedin={STUDENT.linkedin}
       />
-    </>
+    </div>
   );
 }

@@ -1,5 +1,7 @@
 /* Projects.module.css */
 .projects {
+  padding-top: 120px;
+  min-height: calc(100vh - 160px);
   background: linear-gradient(180deg, transparent, rgba(34, 211, 238, 0.03) 50%, transparent);
 }
 

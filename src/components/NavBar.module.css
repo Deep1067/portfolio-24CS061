@@ -1,4 +1,4 @@
-/* NavBar.module.css */
+/* NavBar.module.css – updated in Practical 2 */
 .navbar {
   position: fixed;
   top: 0;
@@ -20,12 +20,19 @@
   padding: 14px 48px;
 }
 
+/* Light-mode overrides */
+:global(.light) .navbar.scrolled {
+  background: rgba(248, 250, 252, 0.92);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+}
+
 /* Brand */
 .brand {
   display: flex;
   align-items: center;
   gap: 10px;
   cursor: pointer;
+  text-decoration: none;
 }
 
 .brandInitial {
@@ -40,6 +47,7 @@
   font-weight: 800;
   color: #fff;
   letter-spacing: 0.02em;
+  flex-shrink: 0;
 }
 
 .brandName {
@@ -63,6 +71,7 @@
   font-weight: 500;
   color: var(--color-text-muted);
   transition: color var(--transition), background var(--transition);
+  text-decoration: none;
 }
 
 .link:hover {
@@ -74,6 +83,30 @@
   color: var(--color-primary-light);
   background: rgba(99, 102, 241, 0.14);
   font-weight: 600;
+}
+
+/* ── Dark/Light theme toggle button ── */
+.themeBtn {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  transition: background var(--transition), border-color var(--transition), transform var(--transition);
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.themeBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: rotate(15deg);
 }
 
 @media (max-width: 640px) {

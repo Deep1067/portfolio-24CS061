@@ -1,68 +1,73 @@
+/**
+ * NavBar.jsx – Practical 2 update
+ * Changes from P1:
+ *  - <a href> replaced with <Link to> from react-router-dom (no full page reload)
+ *  - useLocation() used to highlight the active route
+ *  - useState #1: scrolled (glassmorphism on scroll)
+ *  - Dark/light theme toggle lives in App.jsx; NavBar receives & fires it via props
+ */
 import { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import styles from './NavBar.module.css';
 
-/**
- * NavBar – highlights the active section while scrolling.
- * Props: none (reads scroll position internally)
- */
 const NAV_LINKS = [
-  { label: 'Home',     href: '#home' },
-  { label: 'About',    href: '#about' },
-  { label: 'Skills',   href: '#skills' },
-  { label: 'Projects', href: '#projects' },
-  { label: 'Contact',  href: '#contact' },
+  { label: 'Home',     to: '/' },
+  { label: 'Projects', to: '/projects' },
+  { label: 'Contact',  to: '/contact' },
 ];
 
-export default function NavBar() {
-  const [active, setActive] = useState('home');
-  const [scrolled, setScrolled] = useState(false);
+/**
+ * Props:
+ *   darkMode   {boolean}  – current theme flag
+ *   onToggle   {function} – callback to flip theme in App
+ */
+export default function NavBar({ darkMode, onToggle }) {
+  const [scrolled, setScrolled] = useState(false);   // useState #1 (own)
+  const location = useLocation();
 
   useEffect(() => {
-    const sectionIds = NAV_LINKS.map(l => l.href.replace('#', ''));
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            setActive(entry.target.id);
-          }
-        });
-      },
-      { rootMargin: '-40% 0px -55% 0px' }
-    );
-
-    sectionIds.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) observer.observe(el);
-    });
-
-    const handleScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', handleScroll, { passive: true });
-
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('scroll', handleScroll);
-    };
+    const handler = () => setScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', handler, { passive: true });
+    return () => window.removeEventListener('scroll', handler);
   }, []);
+
+  const isActive = (to) => {
+    if (to === '/') return location.pathname === '/';
+    return location.pathname.startsWith(to);
+  };
 
   return (
     <nav className={`${styles.navbar} ${scrolled ? styles.scrolled : ''}`}>
-      <div className={styles.brand}>
+      {/* Brand */}
+      <Link to="/" className={styles.brand} aria-label="Go to home">
         <span className={styles.brandInitial}>DP</span>
         <span className={styles.brandName}>Deep Patel</span>
-      </div>
+      </Link>
+
+      {/* Nav links – using <Link> so no full page reload occurs */}
       <ul className={styles.links}>
-        {NAV_LINKS.map(({ label, href }) => (
-          <li key={href}>
-            <a
-              href={href}
-              className={`${styles.link} ${active === href.replace('#', '') ? styles.active : ''}`}
+        {NAV_LINKS.map(({ label, to }) => (
+          <li key={to}>
+            <Link
+              to={to}
+              className={`${styles.link} ${isActive(to) ? styles.active : ''}`}
             >
               {label}
-            </a>
+            </Link>
           </li>
         ))}
       </ul>
+
+      {/* Dark / Light mode toggle (useState lives in App.jsx) */}
+      <button
+        id="theme-toggle-btn"
+        className={styles.themeBtn}
+        onClick={onToggle}
+        aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+        title={darkMode ? 'Light mode' : 'Dark mode'}
+      >
+        {darkMode ? '☀️' : '🌙'}
+      </button>
     </nav>
   );
 }

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import styles from './Header.module.css';
 
 /**
@@ -24,16 +25,16 @@ export default function Header({ name, role, description, themeColor, github, li
         <p className={styles.description}>{description}</p>
 
         <div className={styles.actions}>
-          <a
-            href="#projects"
+          <Link
+            to="/projects"
             className={styles.ctaPrimary}
             style={{ backgroundColor: themeColor, boxShadow: `0 0 28px ${themeColor}55` }}
           >
             View Projects
-          </a>
-          <a href="#contact" className={styles.ctaOutline}>
+          </Link>
+          <Link to="/contact" className={styles.ctaOutline}>
             Contact Me
-          </a>
+          </Link>
         </div>
 
         <div className={styles.socials}>
