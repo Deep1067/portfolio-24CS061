@@ -7,6 +7,63 @@ LinkedIn: [https://www.linkedin.com/in/deep-patel-6711aa360/](https://www.linked
 
 ---
 
+## Practical 8 – Performance Optimization and Lazy Loading in React
+
+**Course:** ITUE301 – Advanced Web Development Frameworks  
+**Practical No.:** 8 of 13  
+**Objective:** Improve frontend performance using lazy loading and code splitting techniques with `React.lazy()` and `Suspense`.  
+**CO/PO:** CO1 / PO3, PO5  
+
+### Architecture & Code-Splitting Strategy
+
+```
+Before Optimization (Single Monolithic Bundle):
+ main.bundle.js (307.7 kB) ──> [Home][Projects][TaskManager][Contact][NotFound] all downloaded upfront
+
+After Optimization (Dynamic Code-Split Chunks):
+ index-BiAE4_zp.js   (266.5 kB) ──> Loads initially on entry (core app + vendor libraries)
+ Home-Di_OjMi5.js     (6.9 kB)  ──> Loaded only when "/" is navigated
+ Projects-Csk_S7cy.js (10.8 kB) ──> Loaded only when "/projects" is navigated
+ TaskManager-*.js     (17.1 kB) ──> Loaded only when "/tasks" is navigated
+ Contact-DokN2u5e.js  (6.0 kB)  ──> Loaded only when "/contact" is navigated
+ PerformanceMetrics-* (3.7 kB)  ──> Component-level chunk loaded on demand (Supplementary)
+ NotFound-DJ27384e.js (0.7 kB)  ──> Loaded only when 404 occurs
+```
+
+### Before vs After Bundle Comparison (Vite Build)
+
+| Metric | Before Optimization (Monolithic) | After Optimization (Code-Split) | Impact / Benefit |
+|---|---|---|---|
+| Initial Entry JS Bundle | **307.67 kB** (gzip: 95.63 kB) | **266.49 kB** (gzip: 85.45 kB) | **-41.18 kB reduction (-13.4%)** in initial download |
+| Number of JS Chunks | 1 single chunk | 8 discrete chunks | Route code deferred until visited |
+| CSS Bundling | 1 monolithic CSS file (31.22 kB) | 6 route-scoped CSS chunks | Styles loaded per route demand |
+| Time to Interactive (TTI) | Slower (evaluates all routes) | Faster (evaluates only active route) | Quicker first paint & lower FID |
+| Fallback UI | None (blocking) | Polished animated spinner fallback | Smooth visual transition on slow networks |
+
+### Key Questions & Theoretical Analysis
+
+1. **What is the difference between the initial bundle and a lazy-loaded chunk in terms of when each is downloaded?**  
+   - The *initial bundle* is loaded and parsed immediately when the user first visits the web application before any screen content can be displayed.
+   - A *lazy-loaded chunk* is deferred; the browser only triggers an HTTP request to download the chunk file when the user actually navigates to the associated route or triggers the component.
+
+2. **Why does lazy loading improve perceived performance even though the total amount of code downloaded eventually stays the same?**  
+   - Users rarely visit every page in an application during a single session. By only downloading the code necessary for the current view, initial payload transfer size and JavaScript parsing/compilation times decrease drastically, leading to faster First Contentful Paint (FCP) and Time to Interactive (TTI).
+
+3. **In what situations would lazy loading not be worth the added complexity?**  
+   - In very small applications (e.g. single landing pages or apps with minimal JS < 50 kB), the network overhead of extra HTTP requests and the visual delay of loading fallbacks can outweigh the tiny bytes saved.
+
+### Requirements Implemented
+
+| Requirement | Implementation Details | Status |
+|---|---|---|
+| Route-based Lazy Loading | `React.lazy()` applied to `Home`, `Projects`, `TaskManager`, `Contact`, `NotFound` in `App.jsx` | ✅ Done |
+| Suspense Fallback UI | Custom `<RouteFallback />` animated spinner component provides smooth visual indicator | ✅ Done |
+| Component-Level Lazy Loading (Supplementary 1) | `PerformanceMetricsChart` loaded lazily inside TaskManager on demand | ✅ Done |
+| Bundle Measurement & Documentation | Before vs after build metrics captured from Vite production build | ✅ Done |
+| Multi-Route Preservation | All previous practical routes and states fully preserved | ✅ Done |
+
+---
+
 ## Practical 7 – Authentication and Middleware Pipeline
 
 **Course:** ITUE301 – Advanced Web Development Frameworks  

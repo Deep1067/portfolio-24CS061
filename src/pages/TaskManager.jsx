@@ -11,7 +11,7 @@
  *  - Logout mechanism clearing client token
  *  - Interactive API console testing 401 Unauthorized, /me, and validation middleware
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import {
   getTasks,
   createTask,
@@ -25,6 +25,9 @@ import {
   BASE_URL,
 } from '../api';
 import styles from './TaskManager.module.css';
+
+// Practical 8 Supplementary: Component-level lazy loading for heavy metrics component
+const PerformanceMetricsChart = lazy(() => import('../components/PerformanceMetricsChart'));
 
 export default function TaskManager() {
   const [tasks, setTasks] = useState([]);
@@ -627,6 +630,17 @@ export default function TaskManager() {
             </div>
           </div>
         )}
+
+        {/* ── Practical 8: Lazy-loaded Heavy Component ── */}
+        <Suspense
+          fallback={
+            <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8' }}>
+              Loading performance metrics chunk...
+            </div>
+          }
+        >
+          <PerformanceMetricsChart taskCount={tasks.length} />
+        </Suspense>
 
         {/* ── Bottom Section: Interactive API Console (Practical 7 Auth Tests) ── */}
         <div className={styles.testerSection}>
