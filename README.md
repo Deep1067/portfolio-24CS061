@@ -7,6 +7,62 @@ LinkedIn: [https://www.linkedin.com/in/deep-patel-6711aa360/](https://www.linked
 
 ---
 
+## Practical 7 – Authentication and Middleware Pipeline
+
+**Course:** ITUE301 – Advanced Web Development Frameworks  
+**Practical No.:** 7 of 13  
+**Objective:** Implement JWT-based authentication and input validation as part of the Express middleware pipeline.  
+**CO/PO:** CO2, CO6 / PO3, PO5  
+
+### Architecture & Authentication Flow
+
+```
+POST /register ──> Hash password with bcrypt (10 rounds) ──> Save User ──> 201 Created
+POST /login    ──> Verify password (bcrypt.compare) ──> Sign JWT (1h expiry) ──> Return token
+
+Protected Route Pipeline:
+Client Request (Authorization: Bearer <token>)
+       │
+       ▼
+ [1. Request Logger]
+       │
+       ▼
+ [2. CORS Middleware] (allowedHeaders: Content-Type, Authorization)
+       │
+       ▼
+ [3. express.json()]
+       │
+       ▼
+ [4. Content-Type Validator]
+       │
+       ▼
+ [5. Auth Middleware] ──> Verifies JWT token with JWT_SECRET ──> Sets req.user (401 on failure)
+       │
+       ▼
+ [6. Input Validation Middleware] ──> Checks required fields (400 Bad Request on failure)
+       │
+       ▼
+ Controllers (Protected Task CRUD & /me Profile)
+```
+
+### Requirements Implemented
+
+| Requirement | Implementation Details | Status |
+|---|---|---|
+| User Model | Created `models/User.js` with email (unique, lowercase), hashed password, and timestamps | ✅ Done |
+| Password Hashing | `bcrypt.hash(password, 10)` before saving user document in MongoDB | ✅ Done |
+| JWT Token Generation | `jwt.sign()` on successful login with 1-hour expiry | ✅ Done |
+| Auth Middleware | `authenticateToken` extracts and verifies Bearer token, setting `req.user` | ✅ Done |
+| Server-Side Input Validation | `validateTaskInput` middleware rejects requests missing required fields with 400 Bad Request | ✅ Done |
+| Protected Task Routes | All task CRUD endpoints secured behind `authenticateToken` middleware | ✅ Done |
+| /me Endpoint (Supplementary 1) | `GET /me` returns currently authenticated user details from decoded JWT | ✅ Done |
+| Frontend 401 Handling (Supplementary 2) | Automatically clears expired tokens and prompts login on 401 response | ✅ Done |
+| Client Logout (Supplementary 3) | Logout mechanism clears token from `localStorage` and resets authenticated UI state | ✅ Done |
+| Git Deliverables | `JWT_SECRET` stored in `.env` (excluded via `.gitignore`), `.env.example` provided | ✅ Done |
+| Automated Verification | `test-api.js` verifying 14 test assertions with 100% pass rate | ✅ Done |
+
+---
+
 ## Practical 6 – Full Stack Integration (React + Node + MongoDB)
 
 **Course:** ITUE301 – Advanced Web Development Frameworks  

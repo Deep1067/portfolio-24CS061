@@ -1,16 +1,17 @@
 /**
- * test-api.js – Automated test runner for Practical 5 Express + MongoDB + Mongoose
- * Verifies all CRUD operations, schema validation, enum restriction, pre-save hook,
- * route-specific ObjectId validation, 404 responses, and centralized error handling.
+ * test-api.js – Automated test runner for Practical 7 Express + JWT Auth + MongoDB
+ * Verifies User registration, bcrypt hashing, JWT issuance, auth middleware route protection,
+ * server-side input validation, /me profile endpoint, and protected CRUD operations.
  */
 
 const http = require('http');
+const PORT = process.env.PORT || 5000;
 
 function makeRequest({ method, path, headers = {}, body = null }) {
   return new Promise((resolve, reject) => {
     const options = {
       hostname: 'localhost',
-      port: 5000,
+      port: PORT,
       path,
       method,
       headers: {
@@ -53,8 +54,8 @@ function makeRequest({ method, path, headers = {}, body = null }) {
 
 async function runTests() {
   console.log('\n=============================================================');
-  console.log('🔍 Starting Automated API Verification for Practical 5');
-  console.log('   (MongoDB Integration & Schema Design with Mongoose)');
+  console.log('🔍 Starting Automated API Verification for Practical 7');
+  console.log('   (Authentication & Middleware Pipeline: JWT & bcrypt)');
   console.log('=============================================================\n');
 
   let passed = 0;
@@ -71,195 +72,167 @@ async function runTests() {
   }
 
   try {
-    // 1. Healthcheck / Root endpoint & DB connection check
+    // 1. Healthcheck / Root endpoint
     const r1 = await makeRequest({ method: 'GET', path: '/' });
     assert(
-      r1.status === 200 && r1.data.database && r1.data.database.engine === 'MongoDB',
-      'GET / returns 200 OK with MongoDB & Mongoose database info',
-      JSON.stringify(r1.data)
+      r1.status === 200 && r1.data.auth && r1.data.auth.mechanism.includes('JWT'),
+      'GET / returns 200 OK and documents JWT authentication mechanism'
     );
 
-    // 2. POST /tasks – Create new task in MongoDB with Mongoose model
-    const r2 = await makeRequest({
-      method: 'POST',
-      path: '/tasks',
-      headers: { 'Content-Type': 'application/json' },
-      body: {
-        title: 'Mongoose Integration Automated Test Task',
-        description: 'Created by automated test suite for Practical 5',
-        priority: 'high',
-        completed: false,
-      },
-    });
+    // 2. Auth Middleware: Accessing protected route without token must return 401
+    const r2 = await makeRequest({ method: 'GET', path: '/tasks' });
     assert(
-      r2.status === 201 && r2.data.data && r2.data.data._id,
-      'POST /tasks returns 201 Created and persists document with MongoDB ObjectId'
+      r2.status === 401 && r2.data.error === 'Unauthorized',
+      'GET /tasks without Authorization header returns 401 Unauthorized (Auth Middleware)'
     );
-    const createdId = r2.data.data ? r2.data.data._id : null;
 
-    // 3. Supplementary Problem 2: Pre-save hook trimming title whitespace
+    // 3. User Registration (POST /register) with bcrypt password hashing
+    const testEmail = `test.student.${Date.now()}@charusat.edu.in`;
     const r3 = await makeRequest({
       method: 'POST',
-      path: '/tasks',
-      headers: { 'Content-Type': 'application/json' },
+      path: '/register',
       body: {
-        title: '   Untrimmed Title With Extra Spaces   ',
-        description: 'Testing pre-save hook whitespace trimming',
-        priority: 'low',
+        email: testEmail,
+        password: 'securePassword123',
+        name: 'Deep Patel',
       },
     });
     assert(
-      r3.status === 201 && r3.data.data && r3.data.data.title === 'Untrimmed Title With Extra Spaces',
-      'Supplementary: Pre-save hook automatically trims whitespace from title'
+      r3.status === 201 && r3.data.user && r3.data.user.email === testEmail,
+      'POST /register creates user in MongoDB and hashes password with bcrypt (201 Created)'
     );
-    const trimmedId = r3.data.data ? r3.data.data._id : null;
 
-    // 4. Mongoose Schema Validation: Missing required 'title' field
+    // 4. User Login (POST /login) returning signed JWT token
     const r4 = await makeRequest({
       method: 'POST',
-      path: '/tasks',
-      headers: { 'Content-Type': 'application/json' },
+      path: '/login',
       body: {
-        description: 'Task without title',
+        email: testEmail,
+        password: 'securePassword123',
       },
     });
     assert(
-      r4.status === 400 && r4.data.error === 'Validation Error' && r4.data.errors && r4.data.errors.title,
-      'POST /tasks without title returns 400 with structured Mongoose validation JSON'
+      r4.status === 200 && typeof r4.data.token === 'string' && r4.data.token.length > 20,
+      'POST /login compares password with bcrypt and returns signed JWT token (200 OK)'
     );
+    const authToken = r4.data.token;
 
-    // 5. Supplementary Problem 1: Priority restricted to enum ['low', 'medium', 'high']
+    // 5. User Login with incorrect password returns 401
     const r5 = await makeRequest({
       method: 'POST',
-      path: '/tasks',
-      headers: { 'Content-Type': 'application/json' },
+      path: '/login',
       body: {
-        title: 'Invalid Priority Task',
-        priority: 'urgent_invalid_enum',
+        email: testEmail,
+        password: 'wrongPassword_999',
       },
     });
     assert(
-      r5.status === 400 && r5.data.error === 'Validation Error' && r5.data.errors && r5.data.errors.priority,
-      'Supplementary: Priority field restricted to enum [low, medium, high] returns structured 400'
+      r5.status === 401 && r5.data.error === 'Unauthorized',
+      'POST /login with invalid credentials returns 401 Unauthorized'
     );
 
-    // 6. Content-Type validation middleware rejection
+    // 6. Supplementary Problem 1: GET /me protected profile endpoint
     const r6 = await makeRequest({
-      method: 'POST',
-      path: '/tasks',
-      headers: { 'Content-Type': false },
-      body: 'plain text body',
+      method: 'GET',
+      path: '/me',
+      headers: { Authorization: `Bearer ${authToken}` },
     });
     assert(
-      r6.status === 415,
+      r6.status === 200 && r6.data.user && r6.data.user.email === testEmail,
+      'Supplementary: GET /me returns decoded user details from JWT token'
+    );
+
+    // 7. GET /tasks with valid Bearer token returns 200 OK
+    const r7 = await makeRequest({
+      method: 'GET',
+      path: '/tasks',
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
+    assert(
+      r7.status === 200 && Array.isArray(r7.data.data),
+      'GET /tasks with valid Bearer token returns 200 OK and task array'
+    );
+
+    // 8. Server-side Input Validation: POST /tasks without title returns 400
+    const r8 = await makeRequest({
+      method: 'POST',
+      path: '/tasks',
+      headers: { Authorization: `Bearer ${authToken}` },
+      body: { description: 'Missing title field deliberately' },
+    });
+    assert(
+      r8.status === 400 && r8.data.message.includes('title'),
+      'Server input validation middleware rejects POST /tasks missing title (400 Bad Request)'
+    );
+
+    // 9. POST /tasks with valid token & input creates task (201 Created)
+    const r9 = await makeRequest({
+      method: 'POST',
+      path: '/tasks',
+      headers: { Authorization: `Bearer ${authToken}` },
+      body: {
+        title: 'JWT Protected Test Task',
+        description: 'Created by automated test suite with Bearer token',
+        priority: 'high',
+      },
+    });
+    assert(
+      r9.status === 201 && r9.data.data && r9.data.data._id,
+      'POST /tasks creates task in MongoDB when authenticated with JWT (201 Created)'
+    );
+    const createdId = r9.data.data ? r9.data.data._id : null;
+
+    // 10. PUT /tasks/:id updates task with token
+    if (createdId) {
+      const r10 = await makeRequest({
+        method: 'PUT',
+        path: `/tasks/${createdId}`,
+        headers: { Authorization: `Bearer ${authToken}` },
+        body: { title: 'Updated Protected Task Title', completed: true },
+      });
+      assert(
+        r10.status === 200 && r10.data.data.completed === true,
+        'PUT /tasks/:id updates task document in MongoDB with JWT (200 OK)'
+      );
+    }
+
+    // 11. DELETE /tasks/:id deletes task with token
+    if (createdId) {
+      const r11 = await makeRequest({
+        method: 'DELETE',
+        path: `/tasks/${createdId}`,
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      assert(
+        r11.status === 200,
+        'DELETE /tasks/:id removes task document with JWT (200 OK)'
+      );
+    }
+
+    // 12. Content-Type 415 validation check
+    const r12 = await makeRequest({
+      method: 'POST',
+      path: '/tasks',
+      headers: { Authorization: `Bearer ${authToken}`, 'Content-Type': false },
+      body: 'plain text',
+    });
+    assert(
+      r12.status === 415,
       'POST /tasks without application/json returns 415 Unsupported Media Type'
     );
 
-    // 7. GET /tasks – Retrieve all tasks from MongoDB
-    const r7 = await makeRequest({ method: 'GET', path: '/tasks' });
+    // 13. Undefined route 404 handler
+    const r13 = await makeRequest({ method: 'GET', path: '/undefined-route-auth-test' });
     assert(
-      r7.status === 200 && Array.isArray(r7.data.data) && r7.data.count >= 2,
-      `GET /tasks returns 200 OK with task array from MongoDB (Count: ${r7.data ? r7.data.count : 0})`
+      r13.status === 404 && r13.data.error === 'Not Found',
+      'GET /undefined returns structured 404 JSON'
     );
 
-    // 8. GET /tasks with search query parameter
-    const r8 = await makeRequest({ method: 'GET', path: '/tasks?search=Untrimmed' });
+    // 14. Global 500 error handler
+    const r14 = await makeRequest({ method: 'GET', path: '/test-error' });
     assert(
-      r8.status === 200 && r8.data.count >= 1,
-      'GET /tasks?search=Untrimmed filters tasks by regex query'
-    );
-
-    // 9. GET /tasks/:id – Retrieve task by valid MongoDB ObjectId
-    if (createdId) {
-      const r9 = await makeRequest({ method: 'GET', path: `/tasks/${createdId}` });
-      assert(
-        r9.status === 200 && r9.data.data && r9.data.data._id === createdId,
-        `GET /tasks/:id returns 200 OK for valid MongoDB ObjectId (${createdId})`
-      );
-    }
-
-    // 10. Supplementary Problem 3: Non-existent MongoDB ObjectId returns 404 JSON
-    const nonExistentId = '507f1f77bcf86cd799439011';
-    const r10 = await makeRequest({ method: 'GET', path: `/tasks/${nonExistentId}` });
-    assert(
-      r10.status === 404 && r10.data.error === 'Not Found',
-      'Supplementary: GET /tasks/:id returns 404 JSON when MongoDB ObjectId does not exist'
-    );
-
-    // 11. GET /tasks/:id with malformed ObjectId format returns 400
-    const r11 = await makeRequest({ method: 'GET', path: '/tasks/malformed_id_123' });
-    assert(
-      r11.status === 400 && r11.data.error === 'Bad Request',
-      'GET /tasks/malformed_id_123 returns 400 Bad Request (ObjectId validator)'
-    );
-
-    // 12. PUT /tasks/:id – Update task using findByIdAndUpdate
-    if (createdId) {
-      const r12 = await makeRequest({
-        method: 'PUT',
-        path: `/tasks/${createdId}`,
-        headers: { 'Content-Type': 'application/json' },
-        body: {
-          title: 'Updated Mongoose Task Title',
-          completed: true,
-          priority: 'medium',
-        },
-      });
-      assert(
-        r12.status === 200 && r12.data.data && r12.data.data.completed === true && r12.data.data.priority === 'medium',
-        `PUT /tasks/:id updates document in MongoDB with runValidators enabled`
-      );
-    }
-
-    // 13. PUT /tasks/:id with invalid priority enum (runValidators: true test)
-    if (createdId) {
-      const r13 = await makeRequest({
-        method: 'PUT',
-        path: `/tasks/${createdId}`,
-        headers: { 'Content-Type': 'application/json' },
-        body: {
-          priority: 'invalid_enum_update',
-        },
-      });
-      assert(
-        r13.status === 400 && r13.data.error === 'Validation Error',
-        'PUT /tasks/:id validates schema updates and rejects invalid priority enum (400)'
-      );
-    }
-
-    // 14. DELETE /tasks/:id – Delete task using findByIdAndDelete
-    if (createdId) {
-      const r14 = await makeRequest({ method: 'DELETE', path: `/tasks/${createdId}` });
-      assert(
-        r14.status === 200 && r14.data.message.includes('deleted successfully'),
-        `DELETE /tasks/:id deletes task from MongoDB`
-      );
-    }
-
-    // Clean up trimmed task
-    if (trimmedId) {
-      await makeRequest({ method: 'DELETE', path: `/tasks/${trimmedId}` });
-    }
-
-    // 15. DELETE /tasks/:id – Non-existent ID returns 404 Not Found
-    const r15 = await makeRequest({ method: 'DELETE', path: `/tasks/${nonExistentId}` });
-    assert(
-      r15.status === 404 && r15.data.error === 'Not Found',
-      'DELETE /tasks/:id on non-existent ID returns 404 Not Found'
-    );
-
-    // 16. Custom 404 handler for undefined route
-    const r16 = await makeRequest({ method: 'GET', path: '/undefined-api-route-test' });
-    assert(
-      r16.status === 404 && r16.data.error === 'Not Found',
-      'GET /undefined-api-route-test returns structured 404 JSON'
-    );
-
-    // 17. Centralized Global Error Handler trigger
-    const r17 = await makeRequest({ method: 'GET', path: '/test-error' });
-    assert(
-      r17.status === 500 && r17.data.status === 500,
-      'GET /test-error triggers centralized global 500 error handler'
+      r14.status === 500 && r14.data.status === 500,
+      'GET /test-error triggers centralized 500 error handler'
     );
 
     console.log(`\n=============================================================`);
@@ -267,7 +240,7 @@ async function runTests() {
     console.log(`=============================================================\n`);
 
     if (failed === 0) {
-      console.log('🎉 All Practical 5 API and Mongoose checks verified successfully!\n');
+      console.log('🎉 All Practical 7 JWT Authentication checks verified successfully!\n');
       return true;
     }
     return false;

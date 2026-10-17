@@ -1,7 +1,7 @@
 {
   "name": "task-manager-api-24cs061",
   "version": "1.0.0",
-  "description": "Practical 5: MongoDB Integration and Schema Design with Mongoose - Deep Patel (24CS061)",
+  "description": "Practical 7: Authentication and Middleware Pipeline with JWT & bcrypt - Deep Patel (24CS061)",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
@@ -14,14 +14,18 @@
     "rest-api",
     "crud",
     "middleware",
+    "jwt",
+    "bcrypt",
     "charusat"
   ],
   "author": "Deep Patel (24CS061)",
   "license": "ISC",
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^18.0.8",
     "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
     "mongoose": "^9.11.2"
   }
 }

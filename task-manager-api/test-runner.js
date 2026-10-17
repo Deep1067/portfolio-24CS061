@@ -1,3 +1,4 @@
+process.env.PORT = '5055';
 const { server, mongoose } = require('./server');
 const { runTests } = require('./test-api');
 

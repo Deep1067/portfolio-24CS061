@@ -1,16 +1,18 @@
 /**
- * server.js – Practical 5: MongoDB Integration and Schema Design with Mongoose
+ * server.js – Practical 7: Authentication and Middleware Pipeline
  * Student: Deep Patel  |  Roll No: 24CS061
  * Course:  B.Tech Computer Engineering, CSPIT, CHARUSAT University
  *
  * Architecture & Middleware Pipeline:
  *  1. Request Logging Middleware (method, url, timestamp)
- *  2. CORS Middleware (allows browser client communication)
+ *  2. CORS Middleware (allows browser client communication with Authorization header)
  *  3. Express JSON Body Parser (express.json())
  *  4. Content-Type Validation Middleware (rejects POST/PUT without application/json)
- *  5. REST Router with Mongoose ODM Model Operations
- *  6. 404 Route Not Found Middleware (structured JSON for undefined paths)
- *  7. Centralized Global Error Handler (converts Mongoose errors to structured JSON)
+ *  5. Authentication Middleware (verifies JWT Bearer token on protected routes)
+ *  6. Input Validation Middleware (checks required fields before reaching controllers)
+ *  7. REST Router (Auth routes + Protected Task CRUD routes)
+ *  8. 404 Route Not Found Middleware (structured JSON)
+ *  9. Centralized Global Error Handler (handles Mongoose validation & JWT errors)
  */
 
 const path = require('path');
@@ -20,19 +22,24 @@ require('dotenv').config(); // fallback
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+
 const Task = require('./models/Task');
+const User = require('./models/User');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/taskmanager_24cs061';
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey_24cs061_charusat_itue301';
 
 // ============================================================================
 // 1. MONGODB CONNECTION SETUP
 // ============================================================================
-const seedDefaultTasksIfEmpty = async () => {
+const seedDefaultDataIfEmpty = async () => {
   try {
-    const count = await Task.countDocuments();
-    if (count === 0) {
+    const taskCount = await Task.countDocuments();
+    if (taskCount === 0) {
       await Task.insertMany([
         {
           title: 'Practical 1: Vite + React Portfolio',
@@ -61,11 +68,35 @@ const seedDefaultTasksIfEmpty = async () => {
         {
           title: 'Practical 5: MongoDB & Mongoose Integration',
           description: 'Connect Express to MongoDB, enforce schema validation & pre-save hooks',
+          completed: true,
+          priority: 'high',
+        },
+        {
+          title: 'Practical 6: Full Stack Integration',
+          description: 'Wire React frontend to Node and MongoDB backend with api.js',
+          completed: true,
+          priority: 'high',
+        },
+        {
+          title: 'Practical 7: JWT Authentication & Middleware Pipeline',
+          description: 'Implement register, login, password hashing, and token verification',
           completed: false,
           priority: 'high',
         },
       ]);
       console.log('🌱 Seeded default tasks into MongoDB.');
+    }
+
+    // Seed default demo user if none exists
+    const userCount = await User.countDocuments();
+    if (userCount === 0) {
+      const hashedPassword = await bcrypt.hash('password123', 10);
+      await User.create({
+        email: 'deep.patel@charusat.edu.in',
+        password: hashedPassword,
+        name: 'Deep Patel',
+      });
+      console.log('👤 Seeded demo user: deep.patel@charusat.edu.in / password123');
     }
   } catch (err) {
     console.warn('⚠️ Seeding note:', err.message);
@@ -76,7 +107,7 @@ mongoose
   .connect(MONGO_URI)
   .then(() => {
     console.log('✅ MongoDB connected successfully to:', MONGO_URI);
-    seedDefaultTasksIfEmpty();
+    seedDefaultDataIfEmpty();
   })
   .catch((err) => {
     console.error('❌ MongoDB connection error:', err.message);
@@ -121,20 +152,58 @@ const validateContentType = (req, res, next) => {
 };
 app.use(validateContentType);
 
-// (E) Route-specific MongoDB ObjectId Validator Helper
+// (E) Authentication Middleware (Verifies JWT from Authorization: Bearer <token>)
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({
+      status: 401,
+      error: 'Unauthorized',
+      message: 'Access denied. Missing or malformed Authorization header. Expected format: Bearer <token>',
+    });
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({
+      status: 401,
+      error: 'Unauthorized',
+      message: err.name === 'TokenExpiredError' ? 'Token expired. Please log in again.' : 'Invalid token signature.',
+    });
+  }
+};
+
+// (F) Server-Side Input Validation Middleware for Tasks
+const validateTaskInput = (req, res, next) => {
+  const { title } = req.body;
+  if (!title || typeof title !== 'string' || !title.trim()) {
+    return res.status(400).json({
+      status: 400,
+      error: 'Bad Request',
+      message: "Server input validation failed: 'title' is required and cannot be empty.",
+    });
+  }
+  next();
+};
+
+// Helper: MongoDB ObjectId Validator
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 // ============================================================================
-// 3. RESTful API ROUTES (MongoDB Mongoose CRUD)
+// 3. PUBLIC AUTHENTICATION ROUTES (Register & Login)
 // ============================================================================
 
-// Root welcome & healthcheck route with DB connection status
+// Root welcome & healthcheck route with DB & Auth info
 app.get('/', (req, res) => {
   const dbState = mongoose.connection.readyState;
   const states = ['Disconnected', 'Connected', 'Connecting', 'Disconnecting'];
   res.status(200).json({
     status: 200,
-    message: 'Task Manager REST API with MongoDB & Mongoose is running!',
+    message: 'Task Manager REST API with JWT Authentication is running!',
     student: {
       name: 'Deep Patel',
       rollNo: '24CS061',
@@ -146,19 +215,169 @@ app.get('/', (req, res) => {
       status: states[dbState] || 'Unknown',
       connected: dbState === 1,
     },
+    auth: {
+      mechanism: 'JWT (JSON Web Token)',
+      hashing: 'bcryptjs (salt rounds: 10)',
+      expiry: '1 hour',
+    },
     endpoints: {
-      'GET /tasks': 'Retrieve all tasks from MongoDB (supports ?status=, ?priority=, ?search=)',
-      'GET /tasks/:id': 'Retrieve task by MongoDB ObjectId (returns 404 if not found, 400 if invalid ObjectId)',
-      'POST /tasks': 'Create new task in MongoDB (enforces schema validation & pre-save trimming)',
-      'PUT /tasks/:id': 'Update task by MongoDB ObjectId (with runValidators: true)',
-      'DELETE /tasks/:id': 'Delete task from MongoDB by ObjectId',
-      'GET /test-error': 'Deliberately trigger 500 error handler for testing',
+      'POST /register': 'Register a new user account (hashes password with bcrypt)',
+      'POST /login': 'Login with email & password (returns signed JWT token)',
+      'GET /me': 'Retrieve currently authenticated user details (Protected)',
+      'GET /tasks': 'Retrieve all tasks (Protected with JWT)',
+      'GET /tasks/:id': 'Retrieve task by ObjectId (Protected with JWT)',
+      'POST /tasks': 'Create task with input validation (Protected with JWT)',
+      'PUT /tasks/:id': 'Update task by ObjectId (Protected with JWT)',
+      'DELETE /tasks/:id': 'Delete task by ObjectId (Protected with JWT)',
+      'GET /test-error': 'Deliberately trigger 500 error handler',
     },
   });
 });
 
-// 1. GET /tasks – Retrieve all tasks from MongoDB (Status: 200 OK)
-app.get('/tasks', async (req, res, next) => {
+// 1. POST /register – User registration with bcrypt hashing
+app.post('/register', async (req, res, next) => {
+  try {
+    const { email, password, name } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        status: 400,
+        error: 'Bad Request',
+        message: 'Email and password are required.',
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        status: 400,
+        error: 'Bad Request',
+        message: 'Password must be at least 6 characters long.',
+      });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const existing = await User.findOne({ email: cleanEmail });
+    if (existing) {
+      return res.status(400).json({
+        status: 400,
+        error: 'Bad Request',
+        message: 'An account with this email address already exists.',
+      });
+    }
+
+    // Hash password with bcrypt before saving to MongoDB
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await User.create({
+      email: cleanEmail,
+      password: hashedPassword,
+      name: name ? name.trim() : 'Deep Patel',
+    });
+
+    res.status(201).json({
+      status: 201,
+      message: 'User registered successfully.',
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 2. POST /login – Authenticate user and issue JWT token
+app.post('/login', async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        status: 400,
+        error: 'Bad Request',
+        message: 'Email and password are required.',
+      });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: cleanEmail });
+    if (!user) {
+      return res.status(401).json({
+        status: 401,
+        error: 'Unauthorized',
+        message: 'Invalid email or password.',
+      });
+    }
+
+    // Verify password using bcrypt.compare
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({
+        status: 401,
+        error: 'Unauthorized',
+        message: 'Invalid email or password.',
+      });
+    }
+
+    // Sign JWT token with 1 hour expiration
+    const token = jwt.sign(
+      {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+      },
+      JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    res.status(200).json({
+      status: 200,
+      message: 'Login successful.',
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 3. GET /me (Supplementary Problem) – Returns logged-in user profile from decoded JWT
+app.get('/me', authenticateToken, async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    if (!user) {
+      return res.status(404).json({
+        status: 404,
+        error: 'Not Found',
+        message: 'User profile not found.',
+      });
+    }
+
+    res.status(200).json({
+      status: 200,
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================================================================
+// 4. PROTECTED TASK ROUTES (Requires JWT via authenticateToken middleware)
+// ============================================================================
+
+// 1. GET /tasks – Retrieve all tasks (Protected)
+app.get('/tasks', authenticateToken, async (req, res, next) => {
   try {
     const { status, completed, priority, search } = req.query;
     const filter = {};
@@ -186,14 +405,15 @@ app.get('/tasks', async (req, res, next) => {
       status: 200,
       count: tasks.length,
       data: tasks,
+      authenticatedUser: req.user.email,
     });
   } catch (err) {
     next(err);
   }
 });
 
-// 2. GET /tasks/:id – Retrieve task by ID (Status: 200 OK / 400 Bad Request / 404 Not Found)
-app.get('/tasks/:id', async (req, res, next) => {
+// 2. GET /tasks/:id – Retrieve task by ID (Protected)
+app.get('/tasks/:id', authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -224,12 +444,11 @@ app.get('/tasks/:id', async (req, res, next) => {
   }
 });
 
-// 3. POST /tasks – Create new task in MongoDB (Status: 201 Created / 400 Validation Error)
-app.post('/tasks', async (req, res, next) => {
+// 3. POST /tasks – Create new task (Protected + Input Validation Middleware)
+app.post('/tasks', authenticateToken, validateTaskInput, async (req, res, next) => {
   try {
     const { title, description, completed, priority, status } = req.body;
 
-    // Resolve completed flag from either boolean or status string
     let isCompleted = false;
     if (typeof completed === 'boolean') {
       isCompleted = completed;
@@ -256,8 +475,8 @@ app.post('/tasks', async (req, res, next) => {
   }
 });
 
-// 4. PUT /tasks/:id – Update task by ID (Status: 200 OK / 400 Bad Request / 404 Not Found)
-app.put('/tasks/:id', async (req, res, next) => {
+// 4. PUT /tasks/:id – Update task by ID (Protected)
+app.put('/tasks/:id', authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -306,8 +525,8 @@ app.put('/tasks/:id', async (req, res, next) => {
   }
 });
 
-// 5. DELETE /tasks/:id – Delete task by ID (Status: 200 OK / 400 Bad Request / 404 Not Found)
-app.delete('/tasks/:id', async (req, res, next) => {
+// 5. DELETE /tasks/:id – Delete task by ID (Protected)
+app.delete('/tasks/:id', authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -347,7 +566,7 @@ app.get('/test-error', (req, res, next) => {
 });
 
 // ============================================================================
-// 4. 404 & CENTRALIZED ERROR HANDLING MIDDLEWARE
+// 5. 404 & CENTRALIZED ERROR HANDLING MIDDLEWARE
 // ============================================================================
 
 // (A) Custom 404 handler for undefined routes
@@ -361,11 +580,10 @@ app.use((req, res) => {
 
 // (B) Centralized Global Error Handling Middleware
 // Defined strictly last with 4 arguments: (err, req, res, _next)
-// Transforms raw Mongoose errors into clean, structured JSON responses
 app.use((err, req, res, _next) => {
   console.error('[ERROR HANDLER CAUGHT]:', err.name, err.message);
 
-  // 1. Mongoose Schema Validation Error (Required fields, enum violations, min/max length)
+  // Mongoose Schema Validation Error
   if (err.name === 'ValidationError') {
     const errors = {};
     if (err.errors) {
@@ -381,7 +599,7 @@ app.use((err, req, res, _next) => {
     });
   }
 
-  // 2. Mongoose CastError (e.g. malformed ObjectId, wrong type)
+  // Mongoose CastError
   if (err.name === 'CastError') {
     return res.status(400).json({
       status: 400,
@@ -390,7 +608,16 @@ app.use((err, req, res, _next) => {
     });
   }
 
-  // 3. Default Server Error
+  // JWT Token Errors
+  if (err.name === 'JsonWebTokenError') {
+    return res.status(401).json({
+      status: 401,
+      error: 'Unauthorized',
+      message: 'Invalid authorization token.',
+    });
+  }
+
+  // Default Server Error
   const statusCode = err.status || 500;
   res.status(statusCode).json({
     status: statusCode,
@@ -400,13 +627,14 @@ app.use((err, req, res, _next) => {
 });
 
 // ============================================================================
-// 5. SERVER INITIALIZATION
+// 6. SERVER INITIALIZATION
 // ============================================================================
 const server = app.listen(PORT, () => {
   console.log(`====================================================`);
   console.log(`🚀 Task Manager API Server Running on port ${PORT}`);
   console.log(`📡 URL: http://localhost:${PORT}`);
   console.log(`🗄️  MongoDB URI: ${MONGO_URI}`);
+  console.log(`🔐 JWT Auth: Enabled (Bearer Token Protected)`);
   console.log(`👨‍💻 Student: Deep Patel (Roll No: 24CS061)`);
   console.log(`🏫 CSPIT, CHARUSAT University`);
   console.log(`====================================================`);
