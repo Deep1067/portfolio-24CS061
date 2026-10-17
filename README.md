@@ -7,6 +7,67 @@ LinkedIn: [https://www.linkedin.com/in/deep-patel-6711aa360/](https://www.linked
 
 ---
 
+## Practical 9 – In-Memory Caching and Query Optimization
+
+**Course:** ITUE301 – Advanced Web Development Frameworks  
+**Practical No.:** 9 of 13  
+**Objective:** Implement server-side in-memory caching using `node-cache` and measure its impact on API response time.  
+**CO/PO:** CO2, CO4 / PO3, PO5  
+
+### Architecture & Caching Strategy
+
+```
+GET /tasks Request
+       │
+       ▼
+ [Cache Check (node-cache)]
+ ├── HIT  (In RAM)   ──> Set header 'X-Cache: HIT'  ──> Return cached JSON immediately (~2-3 ms)
+ └── MISS (Not in RAM)──> Query MongoDB ──> Store in cache (TTL: 60s) ──> Set 'X-Cache: MISS' ──> Return data (~15 ms)
+
+Write Operations: POST /tasks, PUT /tasks/:id, DELETE /tasks/:id
+       │
+       ▼
+ [Write to MongoDB] ──> Invalidate cache keys ('all_tasks', 'task_:id') ──> Next read is guaranteed fresh
+```
+
+### Empirical Response Time Comparison (Lab Journal Readings)
+
+Measurements recorded via automated benchmark runner across 3 repeated sample runs:
+
+| Sample Run | Uncached / Cache MISS (MongoDB Disk Query) | Cached / Cache HIT (node-cache In-RAM) | Absolute Reduction | Speedup Factor |
+|---|---|---|---|---|
+| **Reading 1** | 15.16 ms | 3.55 ms | -11.61 ms | **4.3x faster** |
+| **Reading 2** | 14.80 ms | 2.72 ms | -12.08 ms | **5.4x faster** |
+| **Reading 3** | 16.20 ms | 2.12 ms | -14.08 ms | **7.6x faster** |
+| **Average** | **15.39 ms** | **2.80 ms** | **-12.59 ms** | **~5.5x faster** |
+
+### Key Questions & Theoretical Analysis
+
+1. **Why must the cache be invalidated on every write operation, and what would happen to data correctness if it were not?**  
+   - When a client creates, modifies, or deletes a resource via `POST`, `PUT`, or `DELETE`, the persistent state in MongoDB updates immediately. If the corresponding cache keys are not invalidated, subsequent `GET` requests would continue returning the stale pre-write snapshot until the TTL expires, leading to data inconsistency, phantom reads, and broken UI state.
+
+2. **What is a reasonable TTL (time-to-live) for cached data in a task management context, and what trade-off does TTL length represent?**  
+   - A TTL of **30 to 60 seconds** is reasonable for active collaborative tools, balancing freshness and throughput. TTL represents a fundamental trade-off:
+     - **Longer TTL:** Maximizes cache hit ratio, server throughput, and reduces database load, but increases the window during which stale data could persist if an invalidation event is missed.
+     - **Shorter TTL:** Guarantees higher freshness and self-healing from invalidation bugs, but generates more frequent cache misses and database read queries.
+
+3. **Why is in-memory caching (node-cache) not suitable for a multi-server/multi-instance deployment, even though it works fine in this lab?**  
+   - `node-cache` stores items exclusively in the private heap memory of a single Node.js process. In a horizontally scaled cluster behind a load balancer, each server process maintains its own disconnected cache. An update sent to Server A will only invalidate Server A's local cache; Server B and Server C will continue serving stale data. Distributed production systems therefore use shared out-of-process caching tiers such as **Redis** or **Memcached**.
+
+### Requirements Implemented
+
+| Requirement | Implementation Details | Status |
+|---|---|---|
+| In-Memory Caching Engine | Installed and configured `node-cache` (`task-manager-api/cache.js`) with 60s standard TTL | ✅ Done |
+| All-Tasks Cache | `GET /tasks` checks `all_tasks` cache key, returning `X-Cache: HIT` or querying MongoDB | ✅ Done |
+| Cache Invalidation on Writes | `POST /tasks`, `PUT /tasks/:id`, and `DELETE /tasks/:id` invalidate cache keys | ✅ Done |
+| Single-Task Caching (Supplementary 1) | `GET /tasks/:id` cached individually under `task_<id>` with targeted invalidation on update/delete | ✅ Done |
+| Debug Statistics Endpoint (Supplementary 2) | `GET /cache-stats` exposes real-time hits, misses, hit ratio, and active key counts | ✅ Done |
+| Response Header Indicators | `X-Cache: HIT` and `X-Cache: MISS` response headers returned for transparent profiling | ✅ Done |
+| Automated Test Suite | `test-api.js` verifying 13 test assertions with 100% pass rate & empirical benchmark output | ✅ Done |
+
+---
+
 ## Practical 8 – Performance Optimization and Lazy Loading in React
 
 **Course:** ITUE301 – Advanced Web Development Frameworks  

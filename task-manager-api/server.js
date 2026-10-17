@@ -27,11 +27,26 @@ const jwt = require('jsonwebtoken');
 
 const Task = require('./models/Task');
 const User = require('./models/User');
+const cache = require('./cache');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/taskmanager_24cs061';
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey_24cs061_charusat_itue301';
+
+// Practical 9: Cache Invalidation Helper for Write Operations (POST, PUT, DELETE)
+const invalidateTasksCache = (taskId = null) => {
+  const keys = cache.keys();
+  keys.forEach((key) => {
+    if (key === 'all_tasks' || key.startsWith('tasks_')) {
+      cache.del(key);
+    }
+  });
+  if (taskId) {
+    cache.del(`task_${taskId}`);
+  }
+};
+
 
 // ============================================================================
 // 1. MONGODB CONNECTION SETUP
@@ -197,13 +212,13 @@ const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 // 3. PUBLIC AUTHENTICATION ROUTES (Register & Login)
 // ============================================================================
 
-// Root welcome & healthcheck route with DB & Auth info
+// Root welcome & healthcheck route with DB, Auth & Cache info
 app.get('/', (req, res) => {
   const dbState = mongoose.connection.readyState;
   const states = ['Disconnected', 'Connected', 'Connecting', 'Disconnecting'];
   res.status(200).json({
     status: 200,
-    message: 'Task Manager REST API with JWT Authentication is running!',
+    message: 'Task Manager REST API with JWT Authentication & In-Memory Caching is running!',
     student: {
       name: 'Deep Patel',
       rollNo: '24CS061',
@@ -220,19 +235,36 @@ app.get('/', (req, res) => {
       hashing: 'bcryptjs (salt rounds: 10)',
       expiry: '1 hour',
     },
+    caching: {
+      engine: 'node-cache',
+      stdTTL: '60 seconds',
+      invalidation: 'Automatic on POST, PUT, DELETE write operations',
+      debugEndpoint: '/cache-stats',
+    },
     endpoints: {
       'POST /register': 'Register a new user account (hashes password with bcrypt)',
       'POST /login': 'Login with email & password (returns signed JWT token)',
       'GET /me': 'Retrieve currently authenticated user details (Protected)',
-      'GET /tasks': 'Retrieve all tasks (Protected with JWT)',
-      'GET /tasks/:id': 'Retrieve task by ObjectId (Protected with JWT)',
-      'POST /tasks': 'Create task with input validation (Protected with JWT)',
-      'PUT /tasks/:id': 'Update task by ObjectId (Protected with JWT)',
-      'DELETE /tasks/:id': 'Delete task by ObjectId (Protected with JWT)',
+      'GET /tasks': 'Retrieve all tasks (Protected with JWT & cached via node-cache)',
+      'GET /tasks/:id': 'Retrieve task by ObjectId (Protected with JWT & cached separately)',
+      'POST /tasks': 'Create task with input validation (Protected with JWT & invalidates cache)',
+      'PUT /tasks/:id': 'Update task by ObjectId (Protected with JWT & invalidates cache)',
+      'DELETE /tasks/:id': 'Delete task by ObjectId (Protected with JWT & invalidates cache)',
+      'GET /cache-stats': 'Debug endpoint exposing cache-hit / cache-miss counters (Practical 9)',
       'GET /test-error': 'Deliberately trigger 500 error handler',
     },
   });
 });
+
+// Practical 9: Debug endpoint exposing cache-hit / cache-miss counters & stats
+app.get('/cache-stats', (req, res) => {
+  res.status(200).json({
+    status: 200,
+    message: 'Practical 9: In-Memory Cache Statistics (node-cache)',
+    stats: cache.getHitMissStats(),
+  });
+});
+
 
 // 1. POST /register – User registration with bcrypt hashing
 app.post('/register', async (req, res, next) => {
@@ -376,7 +408,7 @@ app.get('/me', authenticateToken, async (req, res, next) => {
 // 4. PROTECTED TASK ROUTES (Requires JWT via authenticateToken middleware)
 // ============================================================================
 
-// 1. GET /tasks – Retrieve all tasks (Protected)
+// 1. GET /tasks – Retrieve all tasks (Protected & Cached via node-cache)
 app.get('/tasks', authenticateToken, async (req, res, next) => {
   try {
     const { status, completed, priority, search } = req.query;
@@ -399,20 +431,38 @@ app.get('/tasks', authenticateToken, async (req, res, next) => {
       ];
     }
 
+    // Practical 9: Stable cache key based on query filters
+    const hasFilters = Object.keys(filter).length > 0;
+    const cacheKey = hasFilters ? `tasks_${JSON.stringify(req.query)}` : 'all_tasks';
+
+    // Step 3: Check cache first
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) {
+      res.set('X-Cache', 'HIT');
+      return res.status(200).json(cachedData);
+    }
+
+    // Cache Miss -> query MongoDB
     const tasks = await Task.find(filter).sort({ createdAt: -1 });
 
-    res.status(200).json({
+    const responsePayload = {
       status: 200,
       count: tasks.length,
       data: tasks,
       authenticatedUser: req.user.email,
-    });
+    };
+
+    // Store in cache with 60 seconds standard TTL
+    cache.set(cacheKey, responsePayload);
+
+    res.set('X-Cache', 'MISS');
+    res.status(200).json(responsePayload);
   } catch (err) {
     next(err);
   }
 });
 
-// 2. GET /tasks/:id – Retrieve task by ID (Protected)
+// 2. GET /tasks/:id – Retrieve task by ID (Protected & Cached separately)
 app.get('/tasks/:id', authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -425,6 +475,15 @@ app.get('/tasks/:id', authenticateToken, async (req, res, next) => {
       });
     }
 
+    // Practical 9 Supplementary: Check single-task cache
+    const cacheKey = `task_${id}`;
+    const cachedTask = cache.get(cacheKey);
+    if (cachedTask) {
+      res.set('X-Cache', 'HIT');
+      return res.status(200).json(cachedTask);
+    }
+
+    // Cache Miss -> query MongoDB
     const task = await Task.findById(id);
 
     if (!task) {
@@ -435,10 +494,16 @@ app.get('/tasks/:id', authenticateToken, async (req, res, next) => {
       });
     }
 
-    res.status(200).json({
+    const responsePayload = {
       status: 200,
       data: task,
-    });
+    };
+
+    // Store in single-task cache with 60s TTL
+    cache.set(cacheKey, responsePayload);
+
+    res.set('X-Cache', 'MISS');
+    res.status(200).json(responsePayload);
   } catch (err) {
     next(err);
   }
@@ -464,6 +529,9 @@ app.post('/tasks', authenticateToken, validateTaskInput, async (req, res, next) 
     });
 
     const savedTask = await task.save();
+
+    // Practical 9 Step 4: Invalidate cache after successful write
+    invalidateTasksCache();
 
     res.status(201).json({
       status: 201,
@@ -515,6 +583,9 @@ app.put('/tasks/:id', authenticateToken, async (req, res, next) => {
       });
     }
 
+    // Practical 9 Step 4: Invalidate all tasks & single task cache after successful write
+    invalidateTasksCache(id);
+
     res.status(200).json({
       status: 200,
       message: 'Task updated successfully in MongoDB.',
@@ -548,6 +619,9 @@ app.delete('/tasks/:id', authenticateToken, async (req, res, next) => {
       });
     }
 
+    // Practical 9 Step 4: Invalidate all tasks & single task cache after successful write
+    invalidateTasksCache(id);
+
     res.status(200).json({
       status: 200,
       message: `Task with ID '${id}' deleted successfully from MongoDB.`,
@@ -557,6 +631,7 @@ app.delete('/tasks/:id', authenticateToken, async (req, res, next) => {
     next(err);
   }
 });
+
 
 // 6. Test Route: Deliberately throw error to test Global Error Handler
 app.get('/test-error', (req, res, next) => {
@@ -640,4 +715,4 @@ const server = app.listen(PORT, () => {
   console.log(`====================================================`);
 });
 
-module.exports = { app, server, mongoose };
+module.exports = { app, server, mongoose, cache };

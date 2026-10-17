@@ -301,11 +301,11 @@ export default function TaskManager() {
   return (
     <div className={`section ${styles.taskPage}`}>
       <div className="container">
-        <span className="badge">Practical 7: JWT Authentication &amp; Middleware Pipeline</span>
-        <h2 className="section-title">Protected Task Management API</h2>
+        <span className="badge">Practical 9: In-Memory Caching &amp; Query Optimization</span>
+        <h2 className="section-title">High-Performance Task Management API</h2>
         <p className="section-subtitle">
-          Express REST API secured with bcrypt password hashing and JWT token verification middleware.
-          All task CRUD operations require a valid <code>Authorization: Bearer &lt;token&gt;</code> header.
+          Full-stack Express API powered by MongoDB, secured with JWT authentication, and accelerated with{' '}
+          <code>node-cache</code> in-memory caching (60s TTL, automatic write invalidation, and hit/miss profiling).
         </p>
 
         {/* ── Toast Notification Banner ── */}
@@ -730,6 +730,16 @@ export default function TaskManager() {
             >
               <span className={styles.methodPost}>POST</span>
               <span>/tasks (Valid Task → 201)</span>
+            </button>
+
+            <button
+              type="button"
+              className={styles.endpointBtn}
+              onClick={() => testEndpoint('GET', '/cache-stats', null, false)}
+              title="Practical 9 Supplementary 2: Expose cache hits, misses, and hit ratio"
+            >
+              <span className={styles.methodGet}>GET</span>
+              <span>/cache-stats (Cache Profiler)</span>
             </button>
 
             <button
