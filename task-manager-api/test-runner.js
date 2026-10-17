@@ -1,17 +1,25 @@
-const { server } = require('./server');
+const { server, mongoose } = require('./server');
 const { runTests } = require('./test-api');
 
 async function main() {
-  // Give server time to listen
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  await runTests();
-  server.close(() => {
+  // Give Express server and MongoDB connection time to initialize
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+
+  const success = await runTests();
+
+  server.close(async () => {
+    try {
+      await mongoose.connection.close();
+      console.log('🔌 MongoDB connection closed cleanly.');
+    } catch (e) {
+      console.error('Error closing DB connection:', e);
+    }
     console.log('✅ Server closed cleanly.');
-    process.exit(0);
+    process.exit(success ? 0 : 1);
   });
 }
 
 main().catch((err) => {
-  console.error(err);
+  console.error('Test runner fatal error:', err);
   process.exit(1);
 });

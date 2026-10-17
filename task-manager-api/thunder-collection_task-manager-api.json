@@ -1,42 +1,42 @@
 {
   "clientName": "Thunder Client",
-  "collectionName": "Practical 4 - Task Manager API (24CS061)",
+  "collectionName": "Practical 5 - MongoDB & Mongoose Task Manager API (24CS061)",
   "collectionId": "task-manager-api-24cs061",
-  "dateExported": "2026-10-16",
-  "version": "1.1",
+  "dateExported": "2026-10-17",
+  "version": "1.2",
   "folders": [],
   "requests": [
     {
       "_id": "req-1",
       "colId": "task-manager-api-24cs061",
-      "name": "1. GET All Tasks (200 OK)",
-      "url": "http://localhost:5000/tasks",
+      "name": "1. GET Root / Healthcheck & MongoDB Info (200 OK)",
+      "url": "http://localhost:5000/",
       "method": "GET",
       "sortNum": 10000,
-      "created": "2026-10-16",
-      "modified": "2026-10-16",
+      "created": "2026-10-17",
+      "modified": "2026-10-17",
       "headers": []
     },
     {
       "_id": "req-2",
       "colId": "task-manager-api-24cs061",
-      "name": "2. GET Task by ID (200 OK)",
-      "url": "http://localhost:5000/tasks/1",
+      "name": "2. GET All Tasks from MongoDB (200 OK)",
+      "url": "http://localhost:5000/tasks",
       "method": "GET",
       "sortNum": 20000,
-      "created": "2026-10-16",
-      "modified": "2026-10-16",
+      "created": "2026-10-17",
+      "modified": "2026-10-17",
       "headers": []
     },
     {
       "_id": "req-3",
       "colId": "task-manager-api-24cs061",
-      "name": "3. POST Create Task (201 Created)",
+      "name": "3. POST Create Task in MongoDB (201 Created)",
       "url": "http://localhost:5000/tasks",
       "method": "POST",
       "sortNum": 30000,
-      "created": "2026-10-16",
-      "modified": "2026-10-16",
+      "created": "2026-10-17",
+      "modified": "2026-10-17",
       "headers": [
         {
           "name": "Content-Type",
@@ -45,19 +45,19 @@
       ],
       "body": {
         "type": "json",
-        "raw": "{\n  \"title\": \"Submit Practical 4 Evidence\",\n  \"description\": \"Captured using Thunder Client in VS Code\",\n  \"priority\": \"High\"\n}",
+        "raw": "{\n  \"title\": \"Complete Practical 5 Lab Report\",\n  \"description\": \"Verify Mongoose schema validation and Postman/Thunder Client CRUD\",\n  \"priority\": \"high\",\n  \"completed\": false\n}",
         "form": []
       }
     },
     {
       "_id": "req-4",
       "colId": "task-manager-api-24cs061",
-      "name": "4. PUT Update Task (200 OK)",
-      "url": "http://localhost:5000/tasks/1",
-      "method": "PUT",
+      "name": "4. POST Pre-Save Hook Whitespace Trim Test (Supplementary 2)",
+      "url": "http://localhost:5000/tasks",
+      "method": "POST",
       "sortNum": 40000,
-      "created": "2026-10-16",
-      "modified": "2026-10-16",
+      "created": "2026-10-17",
+      "modified": "2026-10-17",
       "headers": [
         {
           "name": "Content-Type",
@@ -66,41 +66,83 @@
       ],
       "body": {
         "type": "json",
-        "raw": "{\n  \"title\": \"Practical 1: Vite + React Portfolio (Updated)\",\n  \"status\": \"Completed\",\n  \"priority\": \"High\"\n}",
+        "raw": "{\n  \"title\": \"   Deploy to MongoDB Atlas and Test   \",\n  \"description\": \"Whitespace in title should automatically be trimmed by pre-save hook\",\n  \"priority\": \"low\"\n}",
         "form": []
       }
     },
     {
       "_id": "req-5",
       "colId": "task-manager-api-24cs061",
-      "name": "5. DELETE Task by ID (200 OK)",
-      "url": "http://localhost:5000/tasks/5",
-      "method": "DELETE",
+      "name": "5. POST Schema Validation Error - Missing Title (400 Structured JSON)",
+      "url": "http://localhost:5000/tasks",
+      "method": "POST",
       "sortNum": 50000,
-      "created": "2026-10-16",
-      "modified": "2026-10-16",
-      "headers": []
+      "created": "2026-10-17",
+      "modified": "2026-10-17",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"description\": \"This task deliberately omits the required title field\"\n}",
+        "form": []
+      }
     },
     {
       "_id": "req-6",
       "colId": "task-manager-api-24cs061",
-      "name": "6. GET Invalid ID Format (400 Bad Request - ID Middleware)",
-      "url": "http://localhost:5000/tasks/invalid_abc",
-      "method": "GET",
+      "name": "6. POST Schema Validation Error - Invalid Priority Enum (Supplementary 1)",
+      "url": "http://localhost:5000/tasks",
+      "method": "POST",
       "sortNum": 60000,
-      "created": "2026-10-16",
-      "modified": "2026-10-16",
-      "headers": []
+      "created": "2026-10-17",
+      "modified": "2026-10-17",
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"title\": \"Invalid Priority Example\",\n  \"priority\": \"urgent\"\n}",
+        "form": []
+      }
     },
     {
       "_id": "req-7",
       "colId": "task-manager-api-24cs061",
-      "name": "7. POST Missing Content-Type (415 Media Type Middleware)",
+      "name": "7. GET Task by Non-Existent ObjectId (404 Not Found - Supplementary 3)",
+      "url": "http://localhost:5000/tasks/507f1f77bcf86cd799439011",
+      "method": "GET",
+      "sortNum": 70000,
+      "created": "2026-10-17",
+      "modified": "2026-10-17",
+      "headers": []
+    },
+    {
+      "_id": "req-8",
+      "colId": "task-manager-api-24cs061",
+      "name": "8. GET Invalid ObjectId Format (400 Bad Request)",
+      "url": "http://localhost:5000/tasks/invalid_mongo_id",
+      "method": "GET",
+      "sortNum": 80000,
+      "created": "2026-10-17",
+      "modified": "2026-10-17",
+      "headers": []
+    },
+    {
+      "_id": "req-9",
+      "colId": "task-manager-api-24cs061",
+      "name": "9. POST Missing Content-Type Header (415 Unsupported Media Type)",
       "url": "http://localhost:5000/tasks",
       "method": "POST",
-      "sortNum": 70000,
-      "created": "2026-10-16",
-      "modified": "2026-10-16",
+      "sortNum": 90000,
+      "created": "2026-10-17",
+      "modified": "2026-10-17",
       "headers": [
         {
           "name": "Content-Type",
@@ -113,25 +155,25 @@
       }
     },
     {
-      "_id": "req-8",
+      "_id": "req-10",
       "colId": "task-manager-api-24cs061",
-      "name": "8. GET Undefined Route (404 Custom Handler Middleware)",
+      "name": "10. GET Undefined Route (404 Not Found Middleware)",
       "url": "http://localhost:5000/undefined-endpoint-test",
       "method": "GET",
-      "sortNum": 80000,
-      "created": "2026-10-16",
-      "modified": "2026-10-16",
+      "sortNum": 100000,
+      "created": "2026-10-17",
+      "modified": "2026-10-17",
       "headers": []
     },
     {
-      "_id": "req-9",
+      "_id": "req-11",
       "colId": "task-manager-api-24cs061",
-      "name": "9. GET Test Error (500 Global Error Handler Middleware)",
+      "name": "11. GET Test Error (500 Centralized Error Handler)",
       "url": "http://localhost:5000/test-error",
       "method": "GET",
-      "sortNum": 90000,
-      "created": "2026-10-16",
-      "modified": "2026-10-16",
+      "sortNum": 110000,
+      "created": "2026-10-17",
+      "modified": "2026-10-17",
       "headers": []
     }
   ]

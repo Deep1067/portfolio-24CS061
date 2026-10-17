@@ -7,6 +7,48 @@ LinkedIn: [https://www.linkedin.com/in/deep-patel-6711aa360/](https://www.linked
 
 ---
 
+## Practical 5 – MongoDB Integration and Schema Design with Mongoose
+
+**Course:** ITUE301 – Advanced Web Development Frameworks  
+**Practical No.:** 5 of 13  
+**Objective:** Connect a MongoDB database to an Express server and enforce data validation through a Mongoose schema.  
+**CO/PO:** CO2, CO3 / PO3, PO5  
+
+### Architecture & Data Flow
+
+```
+Express App
+    │
+    ▼
+Mongoose ODM
+├── Schema Validation (required title, default values)
+├── Supplementary 1: Priority Enum ['low', 'medium', 'high']
+├── Supplementary 2: Pre-save Hook (automatically trims title whitespace)
+└── Centralized Error Handler (transforms ValidationError into clean structured JSON)
+    │
+    ▼
+MongoDB Database
+└── tasks collection { _id, title, description, completed, priority, createdAt }
+```
+
+### Requirements Implemented
+
+| Requirement | Implementation Details | Status |
+|---|---|---|
+| Mongoose & Dotenv Integration | Installed and configured via `npm install mongoose dotenv` and `.env` | ✅ Done |
+| MongoDB Connection | `mongoose.connect(process.env.MONGO_URI)` with connection handling and initial seeding | ✅ Done |
+| Mongoose Task Schema | Defined in `models/Task.js` with `title` (required), `description`, `completed` (default false), `createdAt` | ✅ Done |
+| Model Operations CRUD | In-memory storage replaced with `Task.find()`, `Task.create()`, `Task.findById()`, `Task.findByIdAndUpdate()`, `Task.findByIdAndDelete()` | ✅ Done |
+| Priority Enum (Supplementary 1) | `priority` field restricted strictly to `['low', 'medium', 'high']` with schema validator | ✅ Done |
+| Pre-Save Hook (Supplementary 2) | Pre-save hook automatically trims leading/trailing whitespace from `title` | ✅ Done |
+| 404 Endpoint (Supplementary 3) | `GET /tasks/:id` returns structured 404 JSON response if document is not found, and 400 for malformed ObjectId | ✅ Done |
+| Structured Error Handling | Centralized error middleware formats raw Mongoose `ValidationError` & `CastError` into clean JSON | ✅ Done |
+| Git Deliverables | `.env` ignored via `.gitignore`, `.env.example` provided | ✅ Done |
+| Automated Test Suite | `test-api.js` verifying all 17 test assertions with 100% pass rate | ✅ Done |
+| Frontend Portfolio Integration | Updated `/tasks` page in React portfolio showing live MongoDB connection, schema validation, and test console | ✅ Done |
+
+---
+
 ## Practical 4 – Building a RESTful API with Node.js and Express
 
 **Course:** ITUE301 – Advanced Web Development Frameworks  

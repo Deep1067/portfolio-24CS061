@@ -1,7 +1,7 @@
 {
   "name": "task-manager-api-24cs061",
   "version": "1.0.0",
-  "description": "Practical 4: Building a RESTful API with Node.js and Express - Deep Patel (24CS061)",
+  "description": "Practical 5: MongoDB Integration and Schema Design with Mongoose - Deep Patel (24CS061)",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
@@ -20,6 +20,8 @@
   "license": "ISC",
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^4.21.2"
+    "dotenv": "^18.0.8",
+    "express": "^4.21.2",
+    "mongoose": "^9.11.2"
   }
 }
