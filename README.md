@@ -7,6 +7,42 @@ LinkedIn: [https://www.linkedin.com/in/deep-patel-6711aa360/](https://www.linked
 
 ---
 
+## Practical 6 – Full Stack Integration (React + Node + MongoDB)
+
+**Course:** ITUE301 – Advanced Web Development Frameworks  
+**Practical No.:** 6 of 13  
+**Objective:** Wire the React frontend to the Node/Express/MongoDB backend into a fully functional full-stack application.  
+**CO/PO:** CO1, CO2 / PO3, PO5  
+
+### Architecture & Data Flow
+
+```
+React Frontend (localhost:5173)
+       │
+       ▼ [src/api.js] (getTasks, createTask, updateTask, deleteTask)
+Express Backend (localhost:5000) [CORS enabled]
+       │
+       ▼ Mongoose ODM
+MongoDB Database (localhost:27017)
+Flow: UI Form ──> POST /tasks ──> MongoDB ──> UI reconciles ──> updated list rendered
+```
+
+### Requirements Implemented
+
+| Requirement | Implementation Details | Status |
+|---|---|---|
+| CORS Configuration | Express server configured with `cors()` middleware on `localhost:5000` | ✅ Done |
+| Centralized API Module | `src/api.js` created with `BASE_URL = 'http://localhost:5000'` and CRUD methods | ✅ Done |
+| Full-Stack CRUD Flow | End-to-end task creation, viewing, updating, and deleting from React UI to MongoDB | ✅ Done |
+| Replace GitHub Repo Data | `Projects.jsx` updated to consume live tasks from `/tasks` endpoint with tab switch | ✅ Done |
+| Optimistic UI Update (Supplementary 1) | Shows new task in UI immediately before server confirmation and reconciles with DB ID | ✅ Done |
+| Delete Confirmation (Supplementary 2) | Native confirmation dialog (`window.confirm`) prompts before deleting task | ✅ Done |
+| Toast Notification (Supplementary 3) | Toast notification component displays real-time success/error feedback | ✅ Done |
+| Loading & Error States | Proper spinner and error messaging across all API interactions | ✅ Done |
+| Data Persistence | Confirmed data persistence across browser reloads | ✅ Done |
+
+---
+
 ## Practical 5 – MongoDB Integration and Schema Design with Mongoose
 
 **Course:** ITUE301 – Advanced Web Development Frameworks  

@@ -1,35 +1,35 @@
 /**
- * Projects.jsx – Practical 3: API Integration and Data Rendering in React
+ * Projects.jsx – Practical 6 / Practical 3: Full-Stack Integration & API Rendering
  * Student: Deep Patel  |  Roll No: 24CS061
  * Course:  B.Tech Computer Engineering, CSPIT, CHARUSAT University
  *
  * Requirements fulfilled:
- *  ✅ Fetches live GitHub repositories using useEffect() on mount
- *  ✅ Manages 3 asynchronous states: repos (data), loading, and error
+ *  ✅ Step 3: Replaces GitHub fetch logic with calls to your own /tasks endpoint via api.js
+ *  ✅ Manages 3 asynchronous states: tasks/repos (data), loading, and error
  *  ✅ Renders <Spinner /> while request is in progress
  *  ✅ Renders <ErrorMessage /> with retry button when fetch fails
- *  ✅ Renders repository name, html_url, stars count, language, and description
- *  ✅ Search input to filter repositories dynamically by name
+ *  ✅ Allows switching between Practical 6 Backend MongoDB Tasks and Practical 3 GitHub Repos
  *  ✅ Preserves Practical 1 & 2 featured project showcase
  */
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { getTasks } from '../api';
 import Spinner from './Spinner';
 import ErrorMessage from './ErrorMessage';
 import styles from './Projects.module.css';
 
-/* GitHub username for Practical 3 REST API */
+/* GitHub username for Practical 3 fallback view */
 const GITHUB_USERNAME = 'Deep1067';
-const API_URL = `https://api.github.com/users/${GITHUB_USERNAME}/repos?sort=updated&per_page=100`;
-const BROKEN_API_URL = `https://api.github.com/users/${GITHUB_USERNAME}_invalid_endpoint_test/repos`;
+const GITHUB_API_URL = `https://api.github.com/users/${GITHUB_USERNAME}/repos?sort=updated&per_page=100`;
 
-/* ── Preserved Curated Projects from Practical 1 ── */
+/* ── Preserved Curated Projects from Practical 1 & 2 ── */
 const FEATURED_PROJECTS = [
   {
     id: 1,
     title: 'Student Portfolio Website',
     description:
-      'A responsive personal portfolio built with Vite + React. Features reusable components, React Router v6 navigation, and dynamic GitHub REST API integration.',
-    tags: ['React', 'Vite', 'React Router', 'CSS Modules', 'GitHub API'],
+      'A responsive personal portfolio built with Vite + React. Features reusable components, React Router v6 navigation, and dynamic REST API integration.',
+    tags: ['React', 'Vite', 'React Router', 'CSS Modules'],
     status: 'Completed',
     github: 'https://github.com/Deep1067/portfolio-24CS061',
     color: '#6366f1',
@@ -48,82 +48,120 @@ const FEATURED_PROJECTS = [
     id: 3,
     title: 'Task Manager App',
     description:
-      'A full-stack task management tool with user authentication, CRUD operations, and priority-based filtering. Helps students organize their academic workload.',
+      'A full-stack task management tool with Node.js Express, MongoDB, and React. Supports full CRUD operations, optimistic UI, and schema validation.',
     tags: ['Node.js', 'Express', 'MongoDB', 'React'],
-    status: 'Planned',
+    status: 'Completed',
     github: 'https://github.com/Deep1067',
-    color: '#f43f5e',
+    color: '#10b981',
   },
 ];
 
 export default function Projects() {
-  // ── Step 1: 3 state variables for data, loading, and error ──
-  const [repos, setRepos] = useState([]);
+  // Data Source: 'tasks' (Practical 6 Backend API) vs 'github' (Practical 3 Public API)
+  const [dataSource, setDataSource] = useState('tasks');
+
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  // ── Supplementary: Search filter & simulated test error state ──
   const [searchTerm, setSearchTerm] = useState('');
-  const [simulateError, setSimulateError] = useState(false);
 
-  // ── Fetch function with error handling & loading control ──
-  const fetchRepositories = async (forceError = false, extraDelay = 2500) => {
+  // Fetch data depending on active tab
+  const fetchData = async () => {
     setLoading(true);
     setError(null);
 
-    const targetUrl = forceError ? BROKEN_API_URL : API_URL;
-
     try {
-      // Artificial delay so the loading spinner is easily visible and captured for lab screenshots
-      if (extraDelay > 0) {
-        await new Promise((resolve) => setTimeout(resolve, extraDelay));
-      }
-
-      const response = await fetch(targetUrl);
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error(`GitHub API Error (404 Not Found): Could not find user '${GITHUB_USERNAME}'.`);
-        } else if (response.status === 403) {
-          throw new Error('GitHub API rate limit reached (60 requests/hour). Please try again shortly.');
-        } else {
-          throw new Error(`Failed to fetch repositories (HTTP ${response.status}: ${response.statusText}).`);
+      if (dataSource === 'tasks') {
+        // Practical 6: Fetch from own Node/Express + MongoDB backend
+        const res = await getTasks();
+        setItems(res.data || []);
+      } else {
+        // Practical 3: Fetch from GitHub REST API
+        const response = await fetch(GITHUB_API_URL);
+        if (!response.ok) {
+          throw new Error(`GitHub API Error (HTTP ${response.status}: ${response.statusText})`);
         }
+        const data = await response.json();
+        setItems(Array.isArray(data) ? data : []);
       }
-
-      const data = await response.json();
-
-      if (!Array.isArray(data)) {
-        throw new Error(data.message || 'Unexpected response received from GitHub API.');
-      }
-
-      setRepos(data);
     } catch (err) {
-      setError(err.message || 'Network request failed. Please check your connection.');
+      setError(
+        dataSource === 'tasks'
+          ? `Could not connect to Express backend (localhost:5000). Ensure 'npm run server' is running. (${err.message})`
+          : err.message || 'Failed to fetch repositories.'
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  // ── Step 2: useEffect to fetch data on component mount ──
   useEffect(() => {
-    fetchRepositories(simulateError);
-  }, [simulateError]);
+    fetchData();
+  }, [dataSource]);
 
-  // Filtered repositories based on search input (Supplementary Problem)
-  const filteredRepos = repos.filter((repo) =>
-    repo.name.toLowerCase().includes(searchTerm.toLowerCase().trim())
-  );
+  // Search filtering
+  const filteredItems = items.filter((item) => {
+    const name = item.title || item.name || '';
+    const desc = item.description || '';
+    const query = searchTerm.toLowerCase().trim();
+    return name.toLowerCase().includes(query) || desc.toLowerCase().includes(query);
+  });
 
   return (
     <section id="projects" className={`section ${styles.projects}`}>
       <div className="container">
-        <span className="badge">GitHub REST API</span>
-        <h2 className="section-title">My Projects &amp; Repositories</h2>
+        <span className="badge">
+          {dataSource === 'tasks' ? 'Practical 6: Full Stack Integration' : 'Practical 3: GitHub REST API'}
+        </span>
+        <h2 className="section-title">
+          {dataSource === 'tasks' ? 'Live MongoDB Tasks (Backend API)' : 'My GitHub Repositories'}
+        </h2>
         <p className="section-subtitle">
-          Dynamically fetched from GitHub API (<code>api.github.com/users/{GITHUB_USERNAME}/repos</code>) using{' '}
-          <code>useEffect</code> and managed with reactive states.
+          {dataSource === 'tasks' ? (
+            <>
+              Live tasks consumed directly from your Express + MongoDB backend (<code>localhost:5000/tasks</code>) via{' '}
+              <code>src/api.js</code>.
+            </>
+          ) : (
+            <>
+              Dynamically fetched from GitHub public REST API (<code>api.github.com/users/{GITHUB_USERNAME}/repos</code>).
+            </>
+          )}
         </p>
+
+        {/* ── Practical 6 Tab Switcher ── */}
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '24px' }}>
+          <button
+            type="button"
+            className={styles.actionBtn}
+            style={{
+              background: dataSource === 'tasks' ? 'var(--color-primary)' : 'var(--color-surface)',
+              color: dataSource === 'tasks' ? '#fff' : 'var(--color-text)',
+              borderColor: dataSource === 'tasks' ? 'var(--color-primary)' : 'var(--color-border)',
+              padding: '8px 16px',
+              borderRadius: '20px',
+              fontWeight: 600,
+            }}
+            onClick={() => setDataSource('tasks')}
+          >
+            🚀 Backend MongoDB Tasks (P6)
+          </button>
+          <button
+            type="button"
+            className={styles.actionBtn}
+            style={{
+              background: dataSource === 'github' ? 'var(--color-primary)' : 'var(--color-surface)',
+              color: dataSource === 'github' ? '#fff' : 'var(--color-text)',
+              borderColor: dataSource === 'github' ? 'var(--color-primary)' : 'var(--color-border)',
+              padding: '8px 16px',
+              borderRadius: '20px',
+              fontWeight: 600,
+            }}
+            onClick={() => setDataSource('github')}
+          >
+            🐙 GitHub Repositories (P3)
+          </button>
+        </div>
 
         {/* ── Toolbar: Search & Action Controls ── */}
         <div className={styles.controlsBar}>
@@ -132,71 +170,52 @@ export default function Projects() {
             <input
               type="text"
               className={styles.searchInput}
-              placeholder="Search repositories by name..."
+              placeholder={dataSource === 'tasks' ? 'Search backend tasks...' : 'Search repositories...'}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               disabled={loading || !!error}
             />
           </div>
 
-          <div className={styles.actionsGroup}>
-            {!loading && !error && (
-              <span className={styles.countBadge}>
-                {filteredRepos.length} of {repos.length} Repos
-              </span>
-            )}
-
+          <div className={styles.actionsWrapper}>
             <button
               type="button"
               className={styles.actionBtn}
-              onClick={() => fetchRepositories(simulateError, 3000)}
-              title="Refresh repositories"
+              onClick={fetchData}
               disabled={loading}
+              title="Re-fetch from API"
             >
-              <span>🔄</span> Refresh
+              🔄 Refresh
             </button>
-
-            {/* Test Error State toggle for lab evaluation (Step 6) */}
-            <button
-              type="button"
-              className={`${styles.actionBtn} ${styles.errorSimBtn}`}
-              onClick={() => setSimulateError((prev) => !prev)}
-              title="Toggle to simulate broken API URL"
-            >
-              <span>🧪</span> {simulateError ? 'Switch to Normal API' : 'Simulate API Error'}
-            </button>
+            {dataSource === 'tasks' && (
+              <Link to="/tasks" className={styles.actionBtn} style={{ textDecoration: 'none' }}>
+                ✏️ Open Task Manager
+              </Link>
+            )}
           </div>
         </div>
 
-        {/* ── Step 3: Conditional Rendering Based on State ── */}
-        {loading && <Spinner message={`Fetching repositories for @${GITHUB_USERNAME}...`} />}
+        {/* ── Conditional Rendering ── */}
+        {loading && <Spinner message={dataSource === 'tasks' ? 'Fetching tasks from MongoDB...' : 'Fetching repositories from GitHub...'} />}
 
-        {!loading && error && (
-          <ErrorMessage
-            message={error}
-            onRetry={() => {
-              setSimulateError(false);
-              fetchRepositories(false);
-            }}
-          />
+        {!loading && error && <ErrorMessage message={error} onRetry={fetchData} />}
+
+        {!loading && !error && filteredItems.length === 0 && (
+          <div className={styles.emptyState}>
+            <p className={styles.emptyText}>No matching items found.</p>
+          </div>
         )}
 
-        {!loading && !error && (
-          <>
-            {filteredRepos.length === 0 ? (
-              <div className={styles.emptyState}>
-                <div className={styles.emptyIcon}>📂</div>
-                <h3>No repositories found</h3>
-                <p>No repository matching &quot;{searchTerm}&quot; was found. Try clearing your search.</p>
-              </div>
-            ) : (
-              <div className={styles.grid}>
-                {filteredRepos.map((repo) => (
-                  <RepoCard key={repo.id} repo={repo} />
-                ))}
-              </div>
+        {!loading && !error && filteredItems.length > 0 && (
+          <div className={styles.grid}>
+            {filteredItems.map((item) =>
+              dataSource === 'tasks' ? (
+                <TaskCard key={item._id || item.id} task={item} />
+              ) : (
+                <RepoCard key={item.id} repo={item} />
+              )
             )}
-          </>
+          </div>
         )}
 
         {/* ── Preserved Practical 1 & 2 Featured Projects ── */}
@@ -216,6 +235,55 @@ export default function Projects() {
         </div>
       </div>
     </section>
+  );
+}
+
+/* ── Backend Task Card (Practical 6) ── */
+function TaskCard({ task }) {
+  const isDone = task.completed === true || task.status === 'Completed';
+
+  return (
+    <article className={styles.card}>
+      <div className={styles.cardAccent} style={{ background: isDone ? '#10b981' : '#f59e0b' }} />
+
+      <div className={styles.cardBody}>
+        <div className={styles.cardHeader}>
+          <h3 className={styles.cardTitle}>{task.title}</h3>
+          <span
+            className={styles.statusBadge}
+            style={{
+              background: isDone ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+              color: isDone ? '#34d399' : '#fbbf24',
+            }}
+          >
+            {isDone ? 'Completed' : 'Pending'}
+          </span>
+        </div>
+
+        <p className={styles.cardDesc}>{task.description || 'No description provided.'}</p>
+
+        <div className={styles.statsRow}>
+          <span className={styles.langBadge}>
+            <span
+              className={styles.langDot}
+              style={{ background: task.priority === 'high' ? '#f43f5e' : task.priority === 'low' ? '#22c55e' : '#38bdf8' }}
+            />
+            Priority: {task.priority ? task.priority.toUpperCase() : 'MEDIUM'}
+          </span>
+          {task.createdAt && (
+            <span className={styles.statItem}>
+              📅 {new Date(task.createdAt).toLocaleDateString()}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className={styles.cardFooter}>
+        <Link to="/tasks" className={styles.githubLink} style={{ textDecoration: 'none' }}>
+          Manage in Task Manager →
+        </Link>
+      </div>
+    </article>
   );
 }
 
@@ -250,7 +318,6 @@ function RepoCard({ repo }) {
             </span>
           )}
 
-          {/* Repository star count (Supplementary Problem) */}
           <span className={styles.statItem} title={`${repo.stargazers_count} GitHub Stars`}>
             ⭐ {repo.stargazers_count}
           </span>
@@ -262,7 +329,6 @@ function RepoCard({ repo }) {
       </div>
 
       <div className={styles.cardFooter}>
-        {/* Repository html_url link (Problem Statement) */}
         <a
           href={repo.html_url}
           target="_blank"
@@ -270,9 +336,6 @@ function RepoCard({ repo }) {
           className={styles.githubLink}
           aria-label={`View ${repo.name} on GitHub`}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M12 0C5.37 0 0 5.373 0 12c0 5.303 3.438 9.8 8.205 11.387.6.113.82-.258.82-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0 1 12 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
-          </svg>
           View on GitHub
         </a>
         {formattedDate && <span className={styles.updatedText}>Updated {formattedDate}</span>}

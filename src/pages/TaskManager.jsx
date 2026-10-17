@@ -1,31 +1,42 @@
 /**
- * TaskManager.jsx – Practical 5: MongoDB Integration & Schema Design with Mongoose
+ * TaskManager.jsx – Practical 6: Full Stack Integration (React + Node + MongoDB)
  * Student: Deep Patel | Roll No: 24CS061 | CHARUSAT / CSPIT
  *
- * Integrates Practical 5 Node/Express REST API backed by MongoDB & Mongoose.
+ * Full-stack task management dashboard consuming backend API through centralized api.js.
  * Features:
- *  - Live MongoDB CRUD operations
- *  - Mongoose Schema Validation demonstration (required fields, enum restriction)
- *  - Pre-save hook whitespace trimming
- *  - Structured JSON validation responses
- *  - Interactive API Endpoint Console
+ *  - End-to-end CRUD synchronized with MongoDB database
+ *  - Centralized api.js service methods (getTasks, createTask, updateTask, deleteTask)
+ *  - Supplementary 1: Optimistic UI updates on task creation (reconciled on confirmation)
+ *  - Supplementary 2: Confirmation dialog before deleting tasks
+ *  - Supplementary 3: Toast notification system for success and error feedback
+ *  - Live API testing console demonstrating CORS, validation, and error states
  */
 import { useState, useEffect } from 'react';
+import { getTasks, createTask, updateTask, deleteTask, BASE_URL } from '../api';
 import styles from './TaskManager.module.css';
-
-const API_BASE = 'http://localhost:5000';
 
 export default function TaskManager() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [serverOnline, setServerOnline] = useState(false);
   const [dbInfo, setDbInfo] = useState({ engine: 'MongoDB', odm: 'Mongoose', connected: false });
-  const [message, setMessage] = useState('');
 
   // Form states
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
+  const [submitting, setSubmitting] = useState(false);
+
+  // Toast notification state (Supplementary Problem 3)
+  const [toast, setToast] = useState(null);
+
+  const showToast = (text, type = 'success') => {
+    setToast({ text, type });
+    setTimeout(() => {
+      setToast((current) => (current && current.text === text ? null : current));
+    }, 4000);
+  };
 
   // API Tester Console state
   const [testResult, setTestResult] = useState({
@@ -36,144 +47,97 @@ export default function TaskManager() {
     data: null,
   });
 
-  // Check backend server status, database info & load initial tasks
-  const fetchTasks = async () => {
+  // Fetch tasks from MongoDB via centralized api.js
+  const loadTasks = async () => {
     setLoading(true);
+    setError(null);
     try {
-      // 1. Fetch Root / Healthcheck for DB Info
-      const rootRes = await fetch(`${API_BASE}/`);
-      if (rootRes.ok) {
-        const rootJson = await rootRes.json();
+      // Check healthcheck
+      const healthRes = await fetch(`${BASE_URL}/`).catch(() => null);
+      if (healthRes && healthRes.ok) {
+        const healthJson = await healthRes.json();
         setServerOnline(true);
-        if (rootJson.database) {
-          setDbInfo(rootJson.database);
-        }
+        if (healthJson.database) setDbInfo(healthJson.database);
       } else {
         setServerOnline(false);
       }
 
-      // 2. Fetch Tasks from MongoDB
-      const res = await fetch(`${API_BASE}/tasks`);
-      if (res.ok) {
-        const json = await res.json();
-        setTasks(json.data || []);
-      } else {
-        setTasks([]);
-      }
-    } catch {
+      const json = await getTasks();
+      setTasks(json.data || []);
+      setServerOnline(true);
+    } catch (err) {
+      setError(err.message || 'Failed to connect to backend.');
       setServerOnline(false);
       setDbInfo({ engine: 'MongoDB', odm: 'Mongoose', connected: false });
-      // Fallback local preview data if server is offline
-      setTasks((prev) =>
-        prev.length > 0
-          ? prev
-          : [
-              {
-                _id: '67b000000000000000000001',
-                id: '67b000000000000000000001',
-                title: 'Practical 1: Vite + React Portfolio',
-                description: 'Component-based portfolio with props and styling',
-                completed: true,
-                priority: 'high',
-                status: 'Completed',
-              },
-              {
-                _id: '67b000000000000000000002',
-                id: '67b000000000000000000002',
-                title: 'Practical 2: React Router & useState',
-                description: 'Multi-route SPA navigation, controlled form, theme state',
-                completed: true,
-                priority: 'high',
-                status: 'Completed',
-              },
-              {
-                _id: '67b000000000000000000003',
-                id: '67b00000000000000000003',
-                title: 'Practical 3: GitHub REST API Integration',
-                description: 'Asynchronous repository fetching with spinner & error states',
-                completed: true,
-                priority: 'high',
-                status: 'Completed',
-              },
-              {
-                _id: '67b000000000000000000004',
-                id: '67b00000000000000000004',
-                title: 'Practical 4: Express RESTful API',
-                description: 'CRUD backend with request logging & content-type middleware',
-                completed: true,
-                priority: 'high',
-                status: 'Completed',
-              },
-              {
-                _id: '67b000000000000000000005',
-                id: '67b000000000000000000005',
-                title: 'Practical 5: MongoDB & Mongoose Integration',
-                description: 'Mongoose schema validation, pre-save hook, and structured errors',
-                completed: false,
-                priority: 'high',
-                status: 'Pending',
-              },
-            ]
-      );
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchTasks();
+    loadTasks();
   }, []);
 
-  // Handle Create Task (POST /tasks)
+  // Handle Task Creation with Optimistic UI (Supplementary Problem 1)
   const handleCreateTask = async (e) => {
     e.preventDefault();
     if (!title.trim()) return;
 
-    const payload = {
+    const optimisticId = `opt_${Date.now()}`;
+    const newTaskPayload = {
       title: title.trim(),
       description: description.trim(),
       priority,
       completed: false,
     };
 
-    try {
-      const res = await fetch(`${API_BASE}/tasks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+    const optimisticTask = {
+      _id: optimisticId,
+      id: optimisticId,
+      ...newTaskPayload,
+      status: 'Pending',
+      createdAt: new Date().toISOString(),
+      isOptimistic: true,
+    };
 
-      const json = await res.json();
-      if (res.ok) {
-        setTasks((prev) => [json.data, ...prev]);
-        setMessage('✅ Task created and saved in MongoDB (201 Created)!');
-        setTestResult({
-          method: 'POST',
-          endpoint: '/tasks',
-          status: res.status,
-          statusText: 'Created',
-          data: json,
-        });
-      } else {
-        setMessage(`❌ Validation error: ${json.message || 'Failed to save'}`);
-        setTestResult({
-          method: 'POST',
-          endpoint: '/tasks',
-          status: res.status,
-          statusText: 'Validation Error',
-          data: json,
-        });
-      }
-    } catch {
-      const localId = `local_${Date.now()}`;
-      const localNew = { _id: localId, id: localId, ...payload, status: 'Pending' };
-      setTasks((prev) => [localNew, ...prev]);
-      setMessage('ℹ️ Express server offline. Task added to local state.');
-    }
-
+    // 1. Optimistic update: show immediately in UI before server confirms
+    setTasks((prev) => [optimisticTask, ...prev]);
     setTitle('');
     setDescription('');
-    setTimeout(() => setMessage(''), 4500);
+    setSubmitting(true);
+
+    try {
+      // 2. Perform write operation to MongoDB via api.js
+      const res = await createTask(newTaskPayload);
+      const serverTask = res.data;
+
+      // 3. Reconcile optimistic item with persisted document from database
+      setTasks((prev) =>
+        prev.map((t) => (t._id === optimisticId ? serverTask : t))
+      );
+
+      showToast('✅ Task successfully created and saved in MongoDB!', 'success');
+      setTestResult({
+        method: 'POST',
+        endpoint: '/tasks',
+        status: 201,
+        statusText: 'Created',
+        data: res,
+      });
+    } catch (err) {
+      // Rollback optimistic update on failure
+      setTasks((prev) => prev.filter((t) => t._id !== optimisticId));
+      showToast(`❌ Create failed: ${err.message}`, 'error');
+      setTestResult({
+        method: 'POST',
+        endpoint: '/tasks',
+        status: 400,
+        statusText: 'Error',
+        data: { error: err.message },
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Handle Toggle Status (PUT /tasks/:id)
@@ -182,50 +146,37 @@ export default function TaskManager() {
     const nextCompleted = !task.completed;
 
     try {
-      const res = await fetch(`${API_BASE}/tasks/${taskId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completed: nextCompleted }),
-      });
+      const res = await updateTask(taskId, { completed: nextCompleted });
+      const updated = res.data;
 
-      if (res.ok) {
-        const json = await res.json();
-        setTasks((prev) =>
-          prev.map((t) => ((t._id || t.id) === taskId ? json.data : t))
-        );
-      } else {
-        setTasks((prev) =>
-          prev.map((t) =>
-            (t._id || t.id) === taskId
-              ? { ...t, completed: nextCompleted, status: nextCompleted ? 'Completed' : 'Pending' }
-              : t
-          )
-        );
-      }
-    } catch {
       setTasks((prev) =>
-        prev.map((t) =>
-          (t._id || t.id) === taskId
-            ? { ...t, completed: nextCompleted, status: nextCompleted ? 'Completed' : 'Pending' }
-            : t
-        )
+        prev.map((t) => ((t._id || t.id) === taskId ? updated : t))
       );
+      showToast(
+        `✏️ Task marked as ${nextCompleted ? 'Completed' : 'Pending'}!`,
+        'success'
+      );
+    } catch (err) {
+      showToast(`❌ Failed to update task: ${err.message}`, 'error');
     }
   };
 
-  // Handle Delete Task (DELETE /tasks/:id)
-  const handleDeleteTask = async (id) => {
+  // Handle Delete with Confirmation Dialog (Supplementary Problem 2)
+  const handleDeleteTask = async (task) => {
+    const taskId = task._id || task.id;
+
+    // Confirmation dialog before deleting
+    const confirmed = window.confirm(
+      `Are you sure you want to delete task:\n"${task.title}"?\n\nThis will remove the document permanently from MongoDB.`
+    );
+    if (!confirmed) return;
+
     try {
-      const res = await fetch(`${API_BASE}/tasks/${id}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        setTasks((prev) => prev.filter((t) => (t._id || t.id) !== id));
-      } else {
-        setTasks((prev) => prev.filter((t) => (t._id || t.id) !== id));
-      }
-    } catch {
-      setTasks((prev) => prev.filter((t) => (t._id || t.id) !== id));
+      await deleteTask(taskId);
+      setTasks((prev) => prev.filter((t) => (t._id || t.id) !== taskId));
+      showToast('🗑️ Task deleted from MongoDB database.', 'success');
+    } catch (err) {
+      showToast(`❌ Delete failed: ${err.message}`, 'error');
     }
   };
 
@@ -242,7 +193,7 @@ export default function TaskManager() {
     }
 
     try {
-      const res = await fetch(`${API_BASE}${path}`, options);
+      const res = await fetch(`${BASE_URL}${path}`, options);
       let data = null;
       try {
         data = await res.json();
@@ -260,7 +211,6 @@ export default function TaskManager() {
         data,
       });
 
-      // If GET /tasks was clicked, refresh tasks list
       if (method === 'GET' && path === '/tasks' && res.ok && data.data) {
         setTasks(data.data);
       }
@@ -268,8 +218,8 @@ export default function TaskManager() {
       setTestResult({
         method,
         endpoint: path,
-        status: 'Offline / Network Error',
-        statusText: 'Could not connect to http://localhost:5000',
+        status: 'Network Error',
+        statusText: 'Could not connect to Express server',
         data: { error: err.message, hint: 'Start backend in terminal: npm run server' },
       });
     }
@@ -280,12 +230,49 @@ export default function TaskManager() {
   return (
     <div className={`section ${styles.taskPage}`}>
       <div className="container">
-        <span className="badge">Practical 5: MongoDB &amp; Mongoose</span>
-        <h2 className="section-title">MongoDB Integration &amp; Schema Design</h2>
+        <span className="badge">Practical 6: Full Stack Integration</span>
+        <h2 className="section-title">Full Stack Task Management App</h2>
         <p className="section-subtitle">
-          Express REST API connected to MongoDB database with Mongoose ODM. Enforces strict schema validation,
-          pre-save title whitespace trimming, enum restrictions, and clean structured JSON error responses.
+          React SPA on <code>localhost:5173</code> integrated with Express REST API on <code>localhost:5000</code> and MongoDB database.
+          Features centralized <code>api.js</code> service, optimistic UI updates, confirmation dialogs, and toast notifications.
         </p>
+
+        {/* ── Toast Notification Banner (Supplementary 3) ── */}
+        {toast && (
+          <div
+            style={{
+              position: 'fixed',
+              top: '24px',
+              right: '24px',
+              zIndex: 9999,
+              padding: '14px 22px',
+              borderRadius: '8px',
+              fontWeight: '600',
+              fontSize: '0.92rem',
+              color: '#ffffff',
+              background: toast.type === 'error' ? '#ef4444' : '#10b981',
+              boxShadow: '0 10px 25px rgba(0, 0, 0, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              animation: 'fadeIn 0.3s ease',
+            }}
+          >
+            <span>{toast.text}</span>
+            <button
+              onClick={() => setToast(null)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#fff',
+                cursor: 'pointer',
+                fontSize: '1rem',
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* ── Server & Database Status Banner ── */}
         <div className={styles.serverStatusBar}>
@@ -293,7 +280,7 @@ export default function TaskManager() {
             <span className={serverOnline && dbInfo.connected ? styles.dotOnline : styles.dotOffline} />
             <span>
               Express Server: {serverOnline ? 'Online (Port 5000)' : 'Offline / Standby'} &nbsp;|&nbsp;
-              Database: {dbInfo.connected ? `MongoDB (${dbInfo.odm} Connected)` : 'Disconnected / Standby'}
+              Database: {dbInfo.connected ? `MongoDB (${dbInfo.odm} Connected)` : 'Standby / Disconnected'}
             </span>
           </div>
 
@@ -302,49 +289,49 @@ export default function TaskManager() {
             <button
               type="button"
               className={styles.taskActionBtn}
-              onClick={fetchTasks}
-              title="Refresh connection to Express API & MongoDB"
+              onClick={loadTasks}
+              title="Refresh connection & reload tasks"
             >
-              🔄 Refresh Connection
+              🔄 Refresh Tasks
             </button>
           </div>
         </div>
 
-        {message && (
+        {error && (
           <div
             style={{
               marginBottom: '20px',
               padding: '12px 18px',
-              background: 'rgba(99, 102, 241, 0.1)',
-              border: '1px solid rgba(99, 102, 241, 0.3)',
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
               borderRadius: '8px',
-              color: 'var(--color-primary-light)',
+              color: '#f87171',
               fontSize: '0.9rem',
             }}
           >
-            {message}
+            ⚠️ {error} &nbsp;—&nbsp; Ensure Express server is running on port 5000 (<code>npm run server</code>).
           </div>
         )}
 
         <div className={styles.layout}>
-          {/* ── Left Column: Create Task Form (POST /tasks) ── */}
+          {/* ── Left Column: Create Task Form with Optimistic UI ── */}
           <div className={styles.card}>
-            <h3 className={styles.cardTitle}>Create Task (Mongoose Validation)</h3>
+            <h3 className={styles.cardTitle}>Create New Task</h3>
             <p className={styles.cardSubtitle}>
-              Sends a <code>POST /tasks</code> request. Enforces <code>title</code> required constraint,
-              <code>priority</code> enum validation, and pre-save trimming.
+              Sends a <code>POST /tasks</code> via <code>api.createTask()</code>. Features optimistic UI: task appears immediately before server confirmation.
             </p>
 
             <form onSubmit={handleCreateTask}>
               <div className={styles.formGroup}>
-                <label className={styles.label}>Task Title * (Required, Pre-save Trimmed)</label>
+                <label className={styles.label}>Task Title * (Required)</label>
                 <input
                   type="text"
                   className={styles.input}
-                  placeholder="e.g. Design Mongoose Task Schema"
+                  placeholder="e.g. Verify Full Stack Integration"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   required
+                  disabled={submitting}
                 />
               </div>
 
@@ -352,20 +339,22 @@ export default function TaskManager() {
                 <label className={styles.label}>Description</label>
                 <textarea
                   className={styles.textarea}
-                  placeholder="Enter task details, notes, or implementation references..."
+                  placeholder="Enter task details, notes, or implementation specifics..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={3}
+                  disabled={submitting}
                 />
               </div>
 
               <div className={styles.rowInputs}>
                 <div className={styles.formGroup}>
-                  <label className={styles.label}>Priority (Enum: low, medium, high)</label>
+                  <label className={styles.label}>Priority</label>
                   <select
                     className={styles.select}
                     value={priority}
                     onChange={(e) => setPriority(e.target.value)}
+                    disabled={submitting}
                   >
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
@@ -374,28 +363,30 @@ export default function TaskManager() {
                 </div>
 
                 <div className={styles.formGroup} style={{ justifyContent: 'flex-end' }}>
-                  <button type="submit" className={styles.submitBtn}>
-                    + Save to MongoDB
+                  <button type="submit" className={styles.submitBtn} disabled={submitting}>
+                    {submitting ? 'Saving...' : '+ Add Task (Optimistic)'}
                   </button>
                 </div>
               </div>
             </form>
           </div>
 
-          {/* ── Right Column: Tasks List (GET /tasks from MongoDB) ── */}
+          {/* ── Right Column: Persistent Tasks List ── */}
           <div className={styles.card}>
             <div className={styles.taskCountHeader}>
               <h3 className={styles.cardTitle}>Tasks in MongoDB Collection</h3>
-              <span className={styles.badgePriority}>{tasks.length} Documents</span>
+              <span className={styles.badgePriority}>{tasks.length} Total</span>
             </div>
             <p className={styles.cardSubtitle}>
-              Retrieved via <code>Task.find()</code> from MongoDB. Updates and deletes run against the live database.
+              Data persisted in MongoDB. Click button to update (<code>PUT</code>) or trash to delete (<code>DELETE</code> with confirmation dialog).
             </p>
 
             {loading ? (
-              <p style={{ color: 'var(--color-text-muted)' }}>Loading documents from MongoDB...</p>
+              <p style={{ color: 'var(--color-text-muted)' }}>Loading documents from MongoDB via api.js...</p>
             ) : tasks.length === 0 ? (
-              <p style={{ color: 'var(--color-text-dim)', fontStyle: 'italic' }}>No documents found in tasks collection.</p>
+              <p style={{ color: 'var(--color-text-dim)', fontStyle: 'italic' }}>
+                No tasks found. Use the form on the left to add your first task!
+              </p>
             ) : (
               <div>
                 {tasks.map((task) => {
@@ -404,13 +395,22 @@ export default function TaskManager() {
                   const priorityVal = task.priority ? task.priority.toUpperCase() : 'MEDIUM';
 
                   return (
-                    <div key={id} className={styles.taskItem}>
+                    <div
+                      key={id}
+                      className={styles.taskItem}
+                      style={task.isOptimistic ? { opacity: 0.65, borderStyle: 'dashed' } : {}}
+                    >
                       <div className={styles.taskHeader}>
                         <span className={styles.taskTitle}>
                           <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>
                             [{String(id).slice(-6)}]
                           </span>{' '}
                           {task.title}
+                          {task.isOptimistic && (
+                            <span style={{ fontSize: '0.72rem', color: '#fbbf24', marginLeft: '6px' }}>
+                              (syncing...)
+                            </span>
+                          )}
                         </span>
                         <span
                           className={`${styles.badgeStatus} ${
@@ -445,8 +445,8 @@ export default function TaskManager() {
                           <button
                             type="button"
                             className={`${styles.taskActionBtn} ${styles.deleteBtn}`}
-                            onClick={() => handleDeleteTask(id)}
-                            title="Delete Document (DELETE /tasks/:id)"
+                            onClick={() => handleDeleteTask(task)}
+                            title="Delete Task with Confirmation (DELETE /tasks/:id)"
                           >
                             🗑️
                           </button>
@@ -460,15 +460,15 @@ export default function TaskManager() {
           </div>
         </div>
 
-        {/* ── Bottom Section: Interactive API Documentation & Endpoint Tester ── */}
+        {/* ── Bottom Section: Interactive API Console ── */}
         <div className={styles.testerSection}>
           <span className="badge">Interactive API Console</span>
           <h3 className={styles.cardTitle} style={{ fontSize: '1.4rem', marginTop: '8px' }}>
-            MongoDB &amp; Mongoose Endpoint Inspector
+            Full-Stack HTTP Communication Console
           </h3>
           <p className={styles.cardSubtitle}>
-            Test Mongoose schema validation, pre-save hook trimming, enum constraints, and 404 responses
-            directly against the live Express server.
+            Fire requests directly against the Express backend on <code>localhost:5000</code> to observe CORS headers,
+            Mongoose schema validation, and structured JSON responses.
           </p>
 
           <div className={styles.endpointGrid}>
@@ -487,7 +487,7 @@ export default function TaskManager() {
               onClick={() => testEndpoint('GET', `/tasks/${firstTaskId}`)}
             >
               <span className={styles.methodGet}>GET</span>
-              <span>/tasks/:id (Valid ObjectId)</span>
+              <span>/tasks/:id (Task by ID)</span>
             </button>
 
             <button
@@ -495,8 +495,8 @@ export default function TaskManager() {
               className={styles.endpointBtn}
               onClick={() =>
                 testEndpoint('POST', '/tasks', {
-                  title: 'New Task via API Console',
-                  description: 'Persisted to MongoDB collection',
+                  title: 'Full Stack Integration Task',
+                  description: 'Created via console button',
                   priority: 'high',
                   completed: false,
                 })
@@ -510,55 +510,8 @@ export default function TaskManager() {
               type="button"
               className={styles.endpointBtn}
               onClick={() =>
-                testEndpoint('POST', '/tasks', {
-                  title: '   Untrimmed Title With Extra Spaces   ',
-                  description: 'Tests pre-save hook trimming',
-                  priority: 'low',
-                })
-              }
-              title="Supplementary 2: Pre-save hook trims title whitespace"
-            >
-              <span className={styles.methodPost}>POST</span>
-              <span>/tasks (Pre-save Trim Test)</span>
-            </button>
-
-            {/* Validation Error: Missing Title */}
-            <button
-              type="button"
-              className={styles.endpointBtn}
-              onClick={() =>
-                testEndpoint('POST', '/tasks', {
-                  description: 'Missing title field deliberately',
-                })
-              }
-              title="Schema Validation: required title constraint"
-            >
-              <span className={styles.methodPost}>POST</span>
-              <span>/tasks (400 Missing Title)</span>
-            </button>
-
-            {/* Validation Error: Invalid Priority Enum */}
-            <button
-              type="button"
-              className={styles.endpointBtn}
-              onClick={() =>
-                testEndpoint('POST', '/tasks', {
-                  title: 'Invalid Priority Enum Test',
-                  priority: 'urgent',
-                })
-              }
-              title="Supplementary 1: Enum validation ['low', 'medium', 'high']"
-            >
-              <span className={styles.methodPost}>POST</span>
-              <span>/tasks (400 Invalid Enum)</span>
-            </button>
-
-            <button
-              type="button"
-              className={styles.endpointBtn}
-              onClick={() =>
                 testEndpoint('PUT', `/tasks/${firstTaskId}`, {
-                  title: 'Updated Task Title via Mongoose',
+                  title: 'Updated Task via Console',
                   completed: true,
                   priority: 'medium',
                 })
@@ -571,55 +524,52 @@ export default function TaskManager() {
             <button
               type="button"
               className={styles.endpointBtn}
-              onClick={() => testEndpoint('GET', '/tasks/507f1f77bcf86cd799439011')}
-              title="Supplementary 3: Non-existent ObjectId returns 404 JSON"
+              onClick={() =>
+                testEndpoint('POST', '/tasks', {
+                  description: 'Missing title field deliberately',
+                })
+              }
             >
-              <span className={styles.methodGet}>GET</span>
-              <span>/tasks/non-existent (404 JSON)</span>
-            </button>
-
-            <button
-              type="button"
-              className={styles.endpointBtn}
-              onClick={() => testEndpoint('GET', '/tasks/malformed_id_123')}
-              title="Tests ObjectId format validator"
-            >
-              <span className={styles.methodGet}>GET</span>
-              <span>/tasks/malformed (400 Bad ID)</span>
+              <span className={styles.methodPost}>POST</span>
+              <span>/tasks (400 Missing Title)</span>
             </button>
 
             <button
               type="button"
               className={styles.endpointBtn}
               onClick={() =>
-                testEndpoint(
-                  'POST',
-                  '/tasks',
-                  { title: 'No Content-Type Header' },
-                  { 'Content-Type': 'text/plain' }
-                )
+                testEndpoint('POST', '/tasks', {
+                  title: 'Invalid Priority Enum',
+                  priority: 'urgent',
+                })
               }
-              title="Tests Content-Type Validation Middleware"
             >
               <span className={styles.methodPost}>POST</span>
-              <span>/tasks (415 Media Type)</span>
+              <span>/tasks (400 Invalid Enum)</span>
+            </button>
+
+            <button
+              type="button"
+              className={styles.endpointBtn}
+              onClick={() => testEndpoint('GET', '/tasks/507f1f77bcf86cd799439011')}
+            >
+              <span className={styles.methodGet}>GET</span>
+              <span>/tasks/non-existent (404)</span>
             </button>
 
             <button
               type="button"
               className={styles.endpointBtn}
               onClick={() => testEndpoint('GET', '/undefined-route-test-404')}
-              title="Tests 404 Route Not Found Middleware"
             >
               <span className={styles.methodGet}>GET</span>
-              <span>/undefined (404 Not Found)</span>
+              <span>/undefined (404 Route)</span>
             </button>
 
             <button
               type="button"
               className={styles.endpointBtn}
               onClick={() => testEndpoint('GET', '/test-error')}
-              title="Tests Centralized Error Handling Middleware"
             >
               <span className={styles.methodGet}>GET</span>
               <span>/test-error (500 Error)</span>
